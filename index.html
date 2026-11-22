@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fong English</title>
+  <meta name="description" content="Học tiếng Anh mỗi ngày: từ vựng, nghe, nói, trắc nghiệm. Chạy offline trên điện thoại và máy tính.">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Fong English">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="appbar">
+    <a href="#/home" class="brand"><img src="icons/icon-192.png" alt=""> Fong English</a>
+    <nav class="nav" id="nav">
+      <a href="#/home" data-r="home"><span>🏠</span>Trang chủ</a>
+      <a href="#/practice" data-r="practice"><span>🎯</span>Luyện tập</a>
+      <a href="#/dict" data-r="dict"><span>📖</span>Từ điển</a>
+      <a href="#/stats" data-r="stats"><span>📊</span>Thống kê</a>
+      <a href="#/settings" data-r="settings"><span>⚙️</span>Cài đặt</a>
+    </nav>
+  </header>
+  <main id="view" class="view"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
