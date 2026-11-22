@@ -12,16 +12,29 @@ const dayNum = (t = Date.now()) => Math.floor((t - new Date(t).getTimezoneOffset
 const dayLabel = n => { const d = new Date(n * DAY); return d.getUTCDate() + '/' + (d.getUTCMonth() + 1); };
 const POS = { n: 'danh từ', v: 'động từ', adj: 'tính từ', adv: 'trạng từ', phr: 'cụm từ' };
 
-const WORDS = TOPICS.flatMap(t => t.words.map((w, i) => ({
-  id: t.id + ':' + i, topic: t.id, w: w[0], ipa: w[1], pos: w[2], vi: w[3], ex: w[4], exVi: w[5]
-})));
-const WORD = Object.fromEntries(WORDS.map(w => [w.id, w]));
+// Mã của từ = chính từ tiếng Anh viết thường, nên thêm/xóa/sắp xếp dữ liệu không làm lệch tiến độ.
+// Nếu một từ xuất hiện ở nhiều trình độ, giữ lần xuất hiện ở trình độ thấp nhất.
+const wordId = w => w.toLowerCase().trim();
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t]));
+const LEVEL_IDS = LEVELS.map(l => l.id).filter(id => VOCAB[id]);
+const WORDS = [];
+const WORD = {};
+for (const level of LEVEL_IDS) {
+  for (const [topic, list] of Object.entries(VOCAB[level])) {
+    if (!TOPIC[topic]) continue;
+    for (const w of list) {
+      const id = wordId(w[0]);
+      if (WORD[id]) continue;
+      WORD[id] = { id, level, topic, w: w[0], ipa: w[1], pos: w[2], vi: w[3], ex: w[4], exVi: w[5] };
+      WORDS.push(WORD[id]);
+    }
+  }
+}
 
 /* ================= Lưu trữ ================= */
 const STORE = 'fong-english-v1';
 const DEF = {
-  settings: { newPerDay: 10, goalXP: 50, rate: 0.9, voice: '', topics: [], theme: 'auto' },
+  settings: { newPerDay: 10, goalXP: 50, rate: 0.9, voice: '', topics: [], theme: 'auto', level: 'A1', typing: true },
   cards: {},   // id -> { r: số lần nhớ liên tiếp, e: hệ số dễ, i: khoảng cách (ngày), d: ngày đến hạn, l: số lần quên }
   log: {},     // ngày -> { xp, n: từ mới, r: lượt ôn, g: đã đạt mục tiêu }
   best: 0
@@ -30,9 +43,19 @@ let S = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE));
-    if (s) return { settings: { ...DEF.settings, ...s.settings }, cards: s.cards || {}, log: s.log || {}, best: s.best || 0 };
+    if (s) return { settings: { ...DEF.settings, ...s.settings }, cards: migrateCards(s.cards || {}), log: s.log || {}, best: s.best || 0 };
   } catch (e) { /* dữ liệu hỏng: bắt đầu lại */ }
   return JSON.parse(JSON.stringify(DEF));
+}
+// Bản đầu tiên lưu thẻ theo vị trí "chủ đề:số thứ tự" trong danh sách A1. Đổi sang mã theo từ.
+function migrateCards(cards) {
+  const out = {};
+  for (const [key, c] of Object.entries(cards)) {
+    const m = /^(\w+):(\d+)$/.exec(key);
+    const legacy = m && VOCAB.A1[m[1]]?.[+m[2]];
+    out[legacy ? wordId(legacy[0]) : key] = c;
+  }
+  return out;
 }
 function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { toast('Không lưu được tiến độ'); } }
 
@@ -143,7 +166,7 @@ function home() {
     <h2>Hôm nay</h2>
     <a class="card task ${newLeft === 0 ? 'done' : ''}" href="#/learn">
       <div class="ic">📚</div>
-      <div class="grow"><b>Học từ mới</b>
+      <div class="grow"><b>Học từ mới</b> <span class="badge">${esc(LEVELS.find(x => x.id === st.level)?.name || st.level)}</span>
         <div class="muted small">${unseen === 0 ? 'Bạn đã học hết kho từ!' : newLeft ? `Đã học ${l.n}/${st.newPerDay} từ` : `Xong ${l.n} từ ✓ · bấm để học thêm`}</div></div>
       <div class="chev">›</div>
     </a>
@@ -203,8 +226,10 @@ function learn() {
   const left = S.settings.newPerDay - l.n;
   const unseen = WORDS.filter(w => !S.cards[w.id]);
   const pri = S.settings.topics;
-  // Ưu tiên chủ đề đã chọn trong Cài đặt, giữ thứ tự chủ đề cho các từ còn lại.
-  unseen.sort((a, b) => pri.includes(b.topic) - pri.includes(a.topic));
+  // Thứ tự: trình độ đang chọn → các trình độ cao hơn → thấp hơn; trong cùng trình độ ưu tiên chủ đề đã chọn.
+  const lv = Math.max(0, LEVEL_IDS.indexOf(S.settings.level));
+  const rank = w => { const d = LEVEL_IDS.indexOf(w.level) - lv; return d >= 0 ? d : LEVEL_IDS.length - d; };
+  unseen.sort((a, b) => rank(a) - rank(b) || pri.includes(b.topic) - pri.includes(a.topic));
   if (!unseen.length) return emptyState('🏆', 'Bạn đã học hết ' + WORDS.length + ' từ!', 'Hãy tiếp tục ôn tập mỗi ngày để nhớ lâu.', '#/review', 'Ôn tập');
   if (left <= 0) {
     render(`${topbar(0, 0)}<div class="card center stack">
@@ -236,9 +261,11 @@ function cardSession(queue, isNew) {
     if (i >= queue.length) return finish();
     const w = queue[i]; flipped = false;
     const c = S.cards[w.id];
+    // Thẻ đã nhớ được ít nhất một lần: một nửa số lần sẽ hỏi ngược (thấy nghĩa, gõ từ tiếng Anh).
+    if (!isNew && S.settings.typing && c && c.r >= 1 && Math.random() < 0.5) return showTyping(w);
     render(`${topbar(done.size, total)}
       <div class="card flash">
-        <div class="tag">${isNew && !c ? 'Từ mới' : 'Ôn tập'} · ${TOPIC[w.topic].icon} ${TOPIC[w.topic].name}</div>
+        <div class="tag">${isNew && !c ? 'Từ mới' : 'Ôn tập'} · ${w.level} · ${TOPIC[w.topic].icon} ${TOPIC[w.topic].name}</div>
         <div class="word">${esc(w.w)}</div>
         <div class="ipa">${esc(w.ipa)} · <i>${POS[w.pos]}</i></div>
         <button class="icon-btn big" id="sayW" aria-label="Nghe phát âm">🔊</button>
@@ -256,6 +283,42 @@ function cardSession(queue, isNew) {
     $('#sayEx').onclick = () => say(w.ex);
     $('#flip').onclick = flip;
     say(w.w);
+  }
+  function showTyping(w) {
+    flipped = true;   // phím 1–4 không dùng ở chế độ này; chặn lật thẻ
+    let result = null;
+    render(`${topbar(done.size, total)}
+      <div class="card flash">
+        <div class="tag">Gõ từ tiếng Anh · ${w.level} · ${TOPIC[w.topic].icon} ${TOPIC[w.topic].name}</div>
+        <div class="meaning" style="margin-top:4px">${esc(w.vi)}</div>
+        <div class="muted"><i>${POS[w.pos]}</i> · ${w.w.length} chữ cái</div>
+        <div class="muted small">${esc(w.exVi)}</div>
+        <input class="input" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Gõ từ tiếng Anh..." style="margin-top:8px;text-align:center">
+        <div id="fb" style="width:100%"></div>
+      </div>
+      <div id="actions" class="row">
+        <button class="btn ghost" id="giveup">Không nhớ</button>
+        <button class="btn primary" id="check" style="flex:1">Kiểm tra</button>
+      </div>`);
+    const check = giveUp => {
+      if (result !== null) return grade(result);
+      const typed = norm($('#ans').value), want = norm(w.w);
+      const dist = giveUp ? 99 : editDistance(typed, want);
+      result = dist === 0 ? 2 : dist === 1 && want.length > 3 ? 1 : 0;
+      const msg = ['Chưa đúng. Đáp án:', 'Gần đúng (sai 1 chữ):', 'Chính xác! 🎉'][result];
+      $('#ans').disabled = true;
+      $('#fb').innerHTML = `<div class="feedback ${result ? 'ok' : 'no'}">${msg} <b>${esc(w.w)}</b> ${esc(w.ipa)}</div>
+        <div class="example"><button class="icon-btn" id="sayEx">🔊</button><div><div>${highlight(w.ex, w.w)}</div><div class="muted small">${esc(w.exVi)}</div></div></div>`;
+      $('#sayEx').onclick = () => say(w.ex);
+      $('#actions').innerHTML = `<button class="btn primary block" id="check">Tiếp tục</button>`;
+      $('#check').onclick = () => check();
+      $('#check').focus();
+      say(w.w);
+    };
+    $('#check').onclick = () => check();
+    $('#giveup').onclick = () => check(true);
+    $('#ans').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); check(); } };
+    setTimeout(() => $('#ans')?.focus(), 50);
   }
   function preview(q) {
     // Dự đoán khoảng cách ôn tiếp theo mà không lưu.
@@ -303,7 +366,7 @@ function cardSession(queue, isNew) {
       <a class="btn block" href="#/home">Về trang chủ</a></div>`);
   }
   keyHandler = e => {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' && e.key === 'Enter' || $('#ans')) return;
     if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); flipped ? say(queue[i].w) : flip(); }
     else if (flipped && /^[1-4]$/.test(e.key)) grade(+e.key - 1);
   };
@@ -318,6 +381,8 @@ function practice() {
     <p class="muted">${n < 8 ? 'Bạn mới học ' + n + ' từ, bài luyện sẽ lấy thêm từ trong kho. Học thêm để bài sát hơn nhé.' : 'Bài luyện lấy từ ' + n + ' từ bạn đã học.'}</p>
     <a class="card task" href="#/quiz"><div class="ic">✅</div>
       <div class="grow"><b>Trắc nghiệm</b><div class="muted small">10 câu: chọn nghĩa, chọn từ, nghe rồi chọn · +2 XP mỗi câu đúng</div></div><div class="chev">›</div></a>
+    <a class="card task" href="#/cloze"><div class="ic">✍️</div>
+      <div class="grow"><b>Điền từ vào câu</b><div class="muted small">Đọc câu ví dụ, gõ từ còn thiếu · +3 XP mỗi câu đúng</div></div><div class="chev">›</div></a>
     <a class="card task" href="#/listen"><div class="ic">🎧</div>
       <div class="grow"><b>Nghe & chép chính tả</b><div class="muted small">Nghe từ/câu rồi gõ lại · +3 XP mỗi câu đúng</div></div><div class="chev">›</div></a>
     <a class="card task" href="#/speak"><div class="ic">🎤</div>
@@ -329,8 +394,12 @@ function quiz() {
   const pool = practicePool();
   const qs = pick(pool, Math.min(10, pool.length)).map(w => {
     const type = pick(['en', 'vi', 'audio'], 1)[0];
-    const sameTopic = WORDS.filter(x => x.topic === w.topic && x.id !== w.id && x.vi !== w.vi);
-    const opts = shuffle([w, ...pick(sameTopic, 3)]);
+    // Phương án nhiễu: ưu tiên cùng chủ đề và cùng trình độ để câu hỏi không quá lộ.
+    const others = WORDS.filter(x => x.id !== w.id && x.vi !== w.vi);
+    let similar = others.filter(x => x.topic === w.topic && x.level === w.level);
+    if (similar.length < 3) similar = others.filter(x => x.topic === w.topic);
+    if (similar.length < 3) similar = others;
+    const opts = shuffle([w, ...pick(similar, 3)]);
     return { w, type, opts };
   });
   let i = 0, score = 0;
@@ -382,6 +451,59 @@ function resultCard(score, total, again) {
 }
 
 const norm = s => s.toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+// Số ký tự phải sửa để biến a thành b (khoảng cách Levenshtein).
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Tìm dạng của từ xuất hiện trong câu ví dụ (vd. "teach" → "teaches") để làm chỗ trống.
+function clozeToken(w) {
+  const m = new RegExp('\\b' + w.w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:s|es|ed|d|ing|er|est)?\\b', 'i').exec(w.ex);
+  return m ? { token: m[0], at: m.index } : null;
+}
+function cloze() {
+  const items = pick(practicePool().filter(clozeToken), 8);
+  let i = 0, score = 0;
+  function show() {
+    if (i >= items.length) { keyHandler = null; return resultCard(score, items.length, '#/cloze'); }
+    const w = items[i], { token, at } = clozeToken(w);
+    const blank = token[0] + '_'.repeat(token.length - 1).split('').join(' ');
+    let checked = false;
+    render(`${topbar(i, items.length, '#/practice')}<div class="card stack">
+      <div class="muted center">Điền từ còn thiếu vào câu</div>
+      <div class="question" style="font-size:1.3rem;line-height:1.5">${esc(w.ex.slice(0, at))}<span style="color:var(--primary);white-space:nowrap">${blank}</span>${esc(w.ex.slice(at + token.length))}</div>
+      <div class="muted center">${esc(w.exVi)}</div>
+      <input class="input" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Từ còn thiếu...">
+      <div class="row"><button class="btn ghost" id="hint">Gợi ý</button><button class="btn primary" id="check" style="flex:1">Kiểm tra</button></div>
+      <div id="fb"></div></div>`);
+    $('#hint').onclick = () => { $('#ans').placeholder = `${w.w} (${POS[w.pos]}) = ${w.vi}`; $('#ans').focus(); };
+    const check = () => {
+      if (checked) { i++; return show(); }
+      checked = true;
+      const typed = norm($('#ans').value);
+      const ok = typed === norm(token);
+      const close = !ok && editDistance(typed, norm(token)) === 1 && token.length > 3;
+      if (ok) { score++; addXP(3); }
+      $('#ans').disabled = true;
+      $('#fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Chính xác! 🎉' : close ? 'Gần đúng, sai 1 chữ. Đáp án:' : 'Đáp án:'} <b>${esc(token)}</b>
+        <div class="small">${esc(w.w)} ${esc(w.ipa)} · ${POS[w.pos]} · ${esc(w.vi)}</div></div>`;
+      $('#check').textContent = 'Tiếp tục'; $('#hint').classList.add('hidden');
+      $('#check').focus();
+      say(w.ex);
+    };
+    $('#check').onclick = check;
+    $('#ans').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); check(); } };
+    keyHandler = e => { if (checked && e.key === 'Enter' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { e.preventDefault(); check(); } };
+    setTimeout(() => $('#ans')?.focus(), 50);
+  }
+  show();
+}
 
 function listen() {
   const items = shuffle([
@@ -501,30 +623,38 @@ function matchScore(target, heard) {
 }
 
 /* ================= Từ điển ================= */
-let dictTopic = 'all', dictQuery = '';
+let dictTopic = 'all', dictLevel = 'all', dictQuery = '';
 function dict() {
+  const usedTopics = TOPICS.filter(t => WORDS.some(w => w.topic === t.id));
   render(`<h1>Từ điển</h1>
     <input class="input" id="q" type="search" placeholder="Tìm tiếng Anh hoặc tiếng Việt..." value="${esc(dictQuery)}">
-    <div class="chips" id="chips">
-      <button class="chip ${dictTopic === 'all' ? 'on' : ''}" data-t="all">Tất cả (${WORDS.length})</button>
-      ${TOPICS.map(t => `<button class="chip ${dictTopic === t.id ? 'on' : ''}" data-t="${t.id}">${t.icon} ${t.name}</button>`).join('')}
+    <div class="chips" id="levels" style="margin-bottom:0">
+      <button class="chip ${dictLevel === 'all' ? 'on' : ''}" data-l="all">Mọi trình độ (${WORDS.length})</button>
+      ${LEVEL_IDS.map(l => `<button class="chip ${dictLevel === l ? 'on' : ''}" data-l="${l}">${l} (${WORDS.filter(w => w.level === l).length})</button>`).join('')}
     </div>
+    <div class="chips" id="chips">
+      <button class="chip ${dictTopic === 'all' ? 'on' : ''}" data-t="all">Mọi chủ đề</button>
+      ${usedTopics.map(t => `<button class="chip ${dictTopic === t.id ? 'on' : ''}" data-t="${t.id}">${t.icon} ${t.name}</button>`).join('')}
+    </div>
+    <p class="muted small" id="count"></p>
     <div class="card wlist" id="list"></div>`);
   const draw = () => {
     const q = dictQuery.trim().toLowerCase();
-    const list = WORDS.filter(w => (dictTopic === 'all' || w.topic === dictTopic) &&
+    const list = WORDS.filter(w => (dictTopic === 'all' || w.topic === dictTopic) && (dictLevel === 'all' || w.level === dictLevel) &&
       (!q || w.w.toLowerCase().includes(q) || w.vi.toLowerCase().includes(q)));
+    $('#count').textContent = list.length + ' từ' + (list.length > 300 ? ' · đang hiện 300 từ đầu, hãy lọc hoặc tìm để thu hẹp' : '');
     const label = { new: 'Chưa học', learning: 'Đang học', known: 'Đã thuộc' };
-    $('#list').innerHTML = list.length ? list.map(w => `<div class="item">
+    $('#list').innerHTML = list.length ? list.slice(0, 300).map(w => `<div class="item">
         <button class="icon-btn" data-say="${esc(w.w)}" aria-label="Nghe">🔊</button>
-        <div class="grow"><b>${esc(w.w)}</b> <span class="muted small">${esc(w.ipa)} · ${POS[w.pos]}</span>
+        <div class="grow"><b>${esc(w.w)}</b> <span class="muted small">${esc(w.ipa)} · ${POS[w.pos]} · ${w.level}</span>
           <div>${esc(w.vi)}</div><div class="ex">${esc(w.ex)} – ${esc(w.exVi)}</div></div>
         <span class="badge ${status(w.id)}">${label[status(w.id)]}</span></div>`).join('')
       : '<p class="muted center">Không tìm thấy từ nào.</p>';
     bindSay();
   };
   $('#q').oninput = e => { dictQuery = e.target.value; draw(); };
-  $$('.chip').forEach(c => c.onclick = () => { dictTopic = c.dataset.t; $$('.chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
+  $$('#chips .chip').forEach(c => c.onclick = () => { dictTopic = c.dataset.t; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
+  $$('#levels .chip').forEach(c => c.onclick = () => { dictLevel = c.dataset.l; $$('#levels .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
   draw();
 }
 
@@ -547,11 +677,18 @@ function stats() {
     <div class="card"><h2>XP 14 ngày qua</h2>
       <div class="bars">${range.map(d => { const x = S.log[d]?.xp || 0; return `<div class="b ${S.log[d]?.g ? 'met' : ''}" title="${dayLabel(d)}: ${x} XP"><i style="height:${x / max * 100}%"></i><span>${dayLabel(d).split('/')[0]}</span></div>`; }).join('')}</div>
       <p class="muted small">Cột xanh lá = ngày đạt mục tiêu ${S.settings.goalXP} XP.</p></div>
+    <div class="card"><h2>Tiến độ theo trình độ</h2>
+      ${LEVELS.filter(l => LEVEL_IDS.includes(l.id)).map(l => progressRow(l.name, WORDS.filter(w => w.level === l.id))).join('')}
+    </div>
     <div class="card"><h2>Tiến độ theo chủ đề</h2>
-      ${TOPICS.map(tp => { const n = tp.words.filter((_, k) => S.cards[tp.id + ':' + k]).length;
-        return `<div style="margin:10px 0"><div class="row between small"><span>${tp.icon} ${tp.name}</span><span class="muted">${n}/${tp.words.length}</span></div>
-          <div class="tbar"><div style="width:${n / tp.words.length * 100}%"></div></div></div>`; }).join('')}
+      ${TOPICS.map(tp => progressRow(tp.icon + ' ' + tp.name, WORDS.filter(w => w.topic === tp.id))).join('')}
     </div>`);
+}
+function progressRow(label, words) {
+  if (!words.length) return '';
+  const n = words.filter(w => S.cards[w.id]).length;
+  return `<div style="margin:10px 0"><div class="row between small"><span>${label}</span><span class="muted">${n}/${words.length}</span></div>
+    <div class="tbar"><div style="width:${n / words.length * 100}%"></div></div></div>`;
 }
 
 /* ================= Cài đặt ================= */
@@ -563,7 +700,14 @@ function settings() {
       <h2>Mục tiêu hằng ngày</h2>
       <div class="field"><label for="np">Số từ mới mỗi ngày</label><select id="np">${opt([5, 10, 15, 20, 30], st.newPerDay, v => v + ' từ')}</select></div>
       <div class="field"><label for="gx">Mục tiêu XP mỗi ngày</label><select id="gx">${opt([20, 50, 100, 150, 200], st.goalXP, v => v + ' XP')}</select></div>
-      <p class="muted small">Học 1 từ mới = 5 XP · ôn 1 thẻ = 2 XP · trắc nghiệm đúng = 2 XP · nghe chép/nói đúng = 3 XP.</p>
+      <p class="muted small">Học 1 từ mới = 5 XP · ôn 1 thẻ = 2 XP · trắc nghiệm đúng = 2 XP · điền từ/nghe chép/nói đúng = 3 XP.</p>
+    </div>
+    <div class="card">
+      <h2>Trình độ</h2>
+      <div class="field"><label for="lv">Học từ mới ở trình độ</label><select id="lv">${LEVELS.filter(l => LEVEL_IDS.includes(l.id)).map(l =>
+        `<option value="${l.id}" ${l.id === st.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select></div>
+      <p class="muted small" id="lvdesc">${esc(LEVELS.find(l => l.id === st.level)?.desc || '')}. Học hết trình độ này, app tự chuyển sang trình độ tiếp theo.</p>
+      <div class="field"><label for="tp">Khi ôn tập, thỉnh thoảng yêu cầu gõ từ tiếng Anh</label><input type="checkbox" id="tp" ${st.typing ? 'checked' : ''} style="width:22px;height:22px"></div>
     </div>
     <div class="card">
       <h2>Chủ đề ưu tiên</h2>
@@ -588,11 +732,13 @@ function settings() {
       <input type="file" id="file" accept="application/json,.json" class="hidden">
       <button class="btn ghost block" id="reset" style="color:var(--bad)">Xóa toàn bộ tiến độ</button>
     </div>
-    <p class="muted small center">Fong English · ${WORDS.length} từ vựng · ${PHRASES.length} câu giao tiếp</p>`);
+    <p class="muted small center">Fong English · ${WORDS.length} từ vựng (${LEVEL_IDS.join(', ')}) · ${PHRASES.length} câu giao tiếp</p>`);
 
   const set = (k, v) => { st[k] = v; save(); };
   $('#np').onchange = e => set('newPerDay', +e.target.value);
   $('#gx').onchange = e => set('goalXP', +e.target.value);
+  $('#lv').onchange = e => { set('level', e.target.value); settings(); };
+  $('#tp').onchange = e => set('typing', e.target.checked);
   $('#vc').onchange = e => { set('voice', e.target.value); say('Hello! Nice to meet you.'); };
   $('#rt').oninput = e => { $('#rtv').textContent = e.target.value; set('rate', +e.target.value); };
   $('#test').onclick = () => say('Hello! Practice makes perfect.');
@@ -623,13 +769,13 @@ function settings() {
 }
 
 /* ================= Điều hướng ================= */
-const routes = { home, learn, review, practice, quiz, listen, speak: speakPractice, dict, stats, settings };
+const routes = { home, learn, review, practice, quiz, cloze, listen, speak: speakPractice, dict, stats, settings };
 const route = () => (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
 function go() {
   keyHandler = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const r = routes[route()] ? route() : 'home';
-  const tab = { learn: 'home', review: 'home', quiz: 'practice', listen: 'practice', speak: 'practice' }[r] || r;
+  const tab = { learn: 'home', review: 'home', quiz: 'practice', cloze: 'practice', listen: 'practice', speak: 'practice' }[r] || r;
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.r === tab));
   routes[r]();
   window.scrollTo(0, 0);

@@ -1,8 +1,43 @@
-// Nội dung học. Mỗi từ: [từ, phiên âm, loại từ, nghĩa, câu ví dụ, nghĩa câu ví dụ]
+// Nội dung học.
+// Mỗi từ: [từ, phiên âm, loại từ, nghĩa, câu ví dụ, nghĩa câu ví dụ]
 // Loại từ: n = danh từ, v = động từ, adj = tính từ, adv = trạng từ, phr = cụm từ
-// Muốn thêm từ: thêm dòng vào cuối danh sách của chủ đề (đừng chèn giữa, vì tiến độ học lưu theo vị trí).
+// Tiến độ học được lưu theo chính từ tiếng Anh, nên có thể thêm/xóa/sắp xếp lại thoải mái.
+// Từ vựng các trình độ A2, B1, B2 nằm ở js/words-a2.js, words-b1.js, words-b2.js.
+
+const LEVELS = [
+  { id: 'A1', name: 'A1 · Sơ cấp', desc: 'Từ vựng nền tảng cho giao tiếp hằng ngày' },
+  { id: 'A2', name: 'A2 · Cơ bản', desc: 'Mở rộng chủ đề quen thuộc, diễn đạt nhu cầu đơn giản' },
+  { id: 'B1', name: 'B1 · Trung cấp', desc: 'Công việc, du lịch, bày tỏ ý kiến' },
+  { id: 'B2', name: 'B2 · Trung cao cấp', desc: 'Tin tức, xã hội, thảo luận sâu hơn' }
+];
+
 const TOPICS = [
-  { id: 'family', name: 'Gia đình', icon: '👨‍👩‍👧', words: [
+  { id: 'family', name: 'Gia đình', icon: '👨‍👩‍👧' },
+  { id: 'food', name: 'Ăn uống', icon: '🍜' },
+  { id: 'home', name: 'Nhà cửa', icon: '🏠' },
+  { id: 'work', name: 'Công việc', icon: '💼' },
+  { id: 'travel', name: 'Du lịch', icon: '✈️' },
+  { id: 'shopping', name: 'Mua sắm', icon: '🛍️' },
+  { id: 'health', name: 'Sức khỏe', icon: '🩺' },
+  { id: 'time', name: 'Thời gian & thời tiết', icon: '⏰' },
+  { id: 'feelings', name: 'Cảm xúc', icon: '😊' },
+  { id: 'verbs', name: 'Động từ thông dụng', icon: '🏃' },
+  { id: 'adjectives', name: 'Tính từ thông dụng', icon: '✨' },
+  { id: 'tech', name: 'Công nghệ', icon: '💻' },
+  { id: 'education', name: 'Học tập', icon: '🎓' },
+  { id: 'people', name: 'Con người & tính cách', icon: '🧑' },
+  { id: 'hobbies', name: 'Sở thích & giải trí', icon: '🎨' },
+  { id: 'nature', name: 'Thiên nhiên & môi trường', icon: '🌿' },
+  { id: 'money', name: 'Tiền bạc & kinh tế', icon: '💰' },
+  { id: 'society', name: 'Xã hội & tin tức', icon: '📰' },
+  { id: 'connectors', name: 'Từ nối & diễn đạt', icon: '🔗' }
+];
+
+// VOCAB[trình độ][chủ đề] = danh sách từ
+const VOCAB = {};
+
+VOCAB.A1 = {
+  family: [
     ["mother", "/ˈmʌðər/", "n", "mẹ", "My mother cooks very well.", "Mẹ tôi nấu ăn rất ngon."],
     ["father", "/ˈfɑːðər/", "n", "bố, cha", "My father works in a bank.", "Bố tôi làm việc ở ngân hàng."],
     ["parents", "/ˈperənts/", "n", "bố mẹ", "I call my parents every weekend.", "Tôi gọi cho bố mẹ mỗi cuối tuần."],
@@ -23,8 +58,8 @@ const TOPICS = [
     ["twin", "/twɪn/", "n", "sinh đôi", "She has a twin brother.", "Cô ấy có một người anh sinh đôi."],
     ["marry", "/ˈmæri/", "v", "kết hôn", "They will marry next spring.", "Họ sẽ kết hôn vào mùa xuân tới."],
     ["raise", "/reɪz/", "v", "nuôi dạy", "It is not easy to raise children.", "Nuôi dạy con cái không dễ."]
-  ]},
-  { id: 'food', name: 'Ăn uống', icon: '🍜', words: [
+  ],
+  food: [
     ["breakfast", "/ˈbrekfəst/", "n", "bữa sáng", "I usually have breakfast at seven.", "Tôi thường ăn sáng lúc bảy giờ."],
     ["lunch", "/lʌntʃ/", "n", "bữa trưa", "Let's have lunch together.", "Cùng ăn trưa nhé."],
     ["dinner", "/ˈdɪnər/", "n", "bữa tối", "Dinner is ready!", "Bữa tối xong rồi!"],
@@ -45,8 +80,8 @@ const TOPICS = [
     ["delicious", "/dɪˈlɪʃəs/", "adj", "ngon", "This cake is delicious!", "Cái bánh này ngon quá!"],
     ["spicy", "/ˈspaɪsi/", "adj", "cay", "Is this dish spicy?", "Món này có cay không?"],
     ["hungry", "/ˈhʌŋɡri/", "adj", "đói", "I'm so hungry.", "Tôi đói quá."]
-  ]},
-  { id: 'home', name: 'Nhà cửa', icon: '🏠', words: [
+  ],
+  home: [
     ["house", "/haʊs/", "n", "ngôi nhà", "Their house is near the river.", "Nhà họ ở gần sông."],
     ["kitchen", "/ˈkɪtʃɪn/", "n", "nhà bếp", "Mom is in the kitchen.", "Mẹ đang ở trong bếp."],
     ["bedroom", "/ˈbedruːm/", "n", "phòng ngủ", "My bedroom is small but cozy.", "Phòng ngủ của tôi nhỏ nhưng ấm cúng."],
@@ -67,8 +102,8 @@ const TOPICS = [
     ["clean", "/kliːn/", "v", "dọn dẹp, lau chùi", "I clean my room on Sundays.", "Tôi dọn phòng vào Chủ nhật."],
     ["rent", "/rent/", "v", "thuê", "We rent a small apartment.", "Chúng tôi thuê một căn hộ nhỏ."],
     ["furniture", "/ˈfɜːrnɪtʃər/", "n", "đồ nội thất", "We need new furniture.", "Chúng tôi cần đồ nội thất mới."]
-  ]},
-  { id: 'work', name: 'Công việc', icon: '💼', words: [
+  ],
+  work: [
     ["job", "/dʒɑːb/", "n", "công việc", "She just got a new job.", "Cô ấy vừa có việc mới."],
     ["office", "/ˈɔːfɪs/", "n", "văn phòng", "I get to the office at eight.", "Tôi đến văn phòng lúc tám giờ."],
     ["meeting", "/ˈmiːtɪŋ/", "n", "cuộc họp", "The meeting starts at nine.", "Cuộc họp bắt đầu lúc chín giờ."],
@@ -89,8 +124,8 @@ const TOPICS = [
     ["apply", "/əˈplaɪ/", "v", "nộp đơn, ứng tuyển", "I want to apply for this job.", "Tôi muốn ứng tuyển công việc này."],
     ["busy", "/ˈbɪzi/", "adj", "bận", "I'm busy right now.", "Bây giờ tôi đang bận."],
     ["retire", "/rɪˈtaɪər/", "v", "nghỉ hưu", "My father will retire next year.", "Bố tôi sẽ nghỉ hưu vào năm sau."]
-  ]},
-  { id: 'travel', name: 'Du lịch', icon: '✈️', words: [
+  ],
+  travel: [
     ["airport", "/ˈerpɔːrt/", "n", "sân bay", "How do I get to the airport?", "Đến sân bay đi thế nào?"],
     ["flight", "/flaɪt/", "n", "chuyến bay", "My flight is at six.", "Chuyến bay của tôi lúc sáu giờ."],
     ["ticket", "/ˈtɪkɪt/", "n", "vé", "I bought two tickets.", "Tôi đã mua hai vé."],
@@ -111,8 +146,8 @@ const TOPICS = [
     ["abroad", "/əˈbrɔːd/", "adv", "ở nước ngoài", "She wants to study abroad.", "Cô ấy muốn đi du học."],
     ["arrive", "/əˈraɪv/", "v", "đến nơi", "We arrived late last night.", "Tối qua chúng tôi đến muộn."],
     ["delay", "/dɪˈleɪ/", "n", "sự chậm trễ", "Sorry for the delay.", "Xin lỗi vì sự chậm trễ."]
-  ]},
-  { id: 'shopping', name: 'Mua sắm', icon: '🛍️', words: [
+  ],
+  shopping: [
     ["market", "/ˈmɑːrkɪt/", "n", "chợ", "I go to the market every morning.", "Tôi đi chợ mỗi sáng."],
     ["shop", "/ʃɑːp/", "n", "cửa hàng", "The shop opens at nine.", "Cửa hàng mở cửa lúc chín giờ."],
     ["price", "/praɪs/", "n", "giá", "What's the price of this shirt?", "Cái áo này giá bao nhiêu?"],
@@ -133,8 +168,8 @@ const TOPICS = [
     ["cashier", "/kæˈʃɪr/", "n", "thu ngân", "Please pay at the cashier.", "Vui lòng thanh toán ở quầy thu ngân."],
     ["refund", "/ˈriːfʌnd/", "n", "sự hoàn tiền", "I'd like a refund, please.", "Tôi muốn được hoàn tiền."],
     ["order", "/ˈɔːrdər/", "v", "đặt hàng, gọi món", "I ordered a book online.", "Tôi đã đặt một cuốn sách trên mạng."]
-  ]},
-  { id: 'health', name: 'Sức khỏe', icon: '🩺', words: [
+  ],
+  health: [
     ["doctor", "/ˈdɑːktər/", "n", "bác sĩ", "You should see a doctor.", "Bạn nên đi khám bác sĩ."],
     ["hospital", "/ˈhɑːspɪtəl/", "n", "bệnh viện", "The hospital is open all night.", "Bệnh viện mở cửa cả đêm."],
     ["medicine", "/ˈmedɪsən/", "n", "thuốc", "Take this medicine twice a day.", "Uống thuốc này hai lần một ngày."],
@@ -155,8 +190,8 @@ const TOPICS = [
     ["recover", "/rɪˈkʌvər/", "v", "hồi phục", "I hope you recover soon.", "Mong bạn sớm hồi phục."],
     ["stomach", "/ˈstʌmək/", "n", "dạ dày, bụng", "My stomach hurts.", "Tôi bị đau bụng."],
     ["dentist", "/ˈdentɪst/", "n", "nha sĩ", "I go to the dentist twice a year.", "Tôi đi nha sĩ hai lần một năm."]
-  ]},
-  { id: 'time', name: 'Thời gian & thời tiết', icon: '⏰', words: [
+  ],
+  time: [
     ["today", "/təˈdeɪ/", "adv", "hôm nay", "What are you doing today?", "Hôm nay bạn làm gì?"],
     ["tomorrow", "/təˈmɑːroʊ/", "adv", "ngày mai", "See you tomorrow!", "Hẹn gặp lại ngày mai!"],
     ["yesterday", "/ˈjestərdeɪ/", "adv", "hôm qua", "It rained yesterday.", "Hôm qua trời mưa."],
@@ -177,8 +212,8 @@ const TOPICS = [
     ["wind", "/wɪnd/", "n", "gió", "The wind is very strong today.", "Hôm nay gió rất mạnh."],
     ["cool", "/kuːl/", "adj", "mát mẻ", "Autumn in Hanoi is cool.", "Mùa thu Hà Nội mát mẻ."],
     ["season", "/ˈsiːzən/", "n", "mùa", "Which season do you like best?", "Bạn thích mùa nào nhất?"]
-  ]},
-  { id: 'feelings', name: 'Cảm xúc', icon: '😊', words: [
+  ],
+  feelings: [
     ["happy", "/ˈhæpi/", "adj", "vui vẻ, hạnh phúc", "I'm happy to see you.", "Tôi rất vui được gặp bạn."],
     ["sad", "/sæd/", "adj", "buồn", "Why are you sad?", "Sao bạn buồn vậy?"],
     ["angry", "/ˈæŋɡri/", "adj", "tức giận", "Don't be angry with me.", "Đừng giận tôi nhé."],
@@ -199,8 +234,8 @@ const TOPICS = [
     ["disappointed", "/ˌdɪsəˈpɔɪntɪd/", "adj", "thất vọng", "I was disappointed with the movie.", "Tôi thất vọng về bộ phim."],
     ["love", "/lʌv/", "v", "yêu, rất thích", "I love this song.", "Tôi rất thích bài hát này."],
     ["hate", "/heɪt/", "v", "ghét", "I hate waiting.", "Tôi ghét phải chờ đợi."]
-  ]},
-  { id: 'verbs', name: 'Động từ thông dụng', icon: '🏃', words: [
+  ],
+  verbs: [
     ["go", "/ɡoʊ/", "v", "đi", "I go to work by bike.", "Tôi đi làm bằng xe đạp."],
     ["come", "/kʌm/", "v", "đến", "Can you come to my party?", "Bạn đến bữa tiệc của tôi được không?"],
     ["eat", "/iːt/", "v", "ăn", "What do you want to eat?", "Bạn muốn ăn gì?"],
@@ -221,8 +256,8 @@ const TOPICS = [
     ["remember", "/rɪˈmembər/", "v", "nhớ", "Do you remember me?", "Bạn có nhớ tôi không?"],
     ["forget", "/fərˈɡet/", "v", "quên", "Don't forget to call me.", "Đừng quên gọi cho tôi."],
     ["wait", "/weɪt/", "v", "chờ đợi", "Please wait here.", "Vui lòng đợi ở đây."]
-  ]},
-  { id: 'adjectives', name: 'Tính từ thông dụng', icon: '✨', words: [
+  ],
+  adjectives: [
     ["big", "/bɪɡ/", "adj", "to, lớn", "They live in a big house.", "Họ sống trong một ngôi nhà lớn."],
     ["small", "/smɔːl/", "adj", "nhỏ", "This room is too small.", "Phòng này nhỏ quá."],
     ["new", "/nuː/", "adj", "mới", "I like your new haircut.", "Tôi thích kiểu tóc mới của bạn."],
@@ -243,8 +278,8 @@ const TOPICS = [
     ["careful", "/ˈkerfəl/", "adj", "cẩn thận", "Be careful on the road.", "Đi đường cẩn thận nhé."],
     ["strong", "/strɔːŋ/", "adj", "mạnh, khỏe", "He is very strong.", "Anh ấy rất khỏe."],
     ["popular", "/ˈpɑːpjələr/", "adj", "phổ biến, được yêu thích", "This song is very popular.", "Bài hát này rất được yêu thích."]
-  ]},
-  { id: 'tech', name: 'Công nghệ', icon: '💻', words: [
+  ],
+  tech: [
     ["computer", "/kəmˈpjuːtər/", "n", "máy tính", "My computer is very slow.", "Máy tính của tôi rất chậm."],
     ["phone", "/foʊn/", "n", "điện thoại", "Can I use your phone?", "Tôi dùng điện thoại của bạn được không?"],
     ["internet", "/ˈɪntərnet/", "n", "mạng internet", "Is there internet here?", "Ở đây có mạng không?"],
@@ -265,8 +300,8 @@ const TOPICS = [
     ["file", "/faɪl/", "n", "tệp tin", "Save the file before closing.", "Lưu tệp trước khi đóng."],
     ["camera", "/ˈkæmərə/", "n", "máy ảnh", "This phone has a great camera.", "Điện thoại này có camera rất tốt."],
     ["software", "/ˈsɔːftwer/", "n", "phần mềm", "We use this software at work.", "Chúng tôi dùng phần mềm này ở chỗ làm."]
-  ]}
-];
+  ]
+};
 
 // Câu giao tiếp hằng ngày: [tiếng Anh, tiếng Việt]
 const PHRASES = [
