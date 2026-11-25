@@ -10,7 +10,9 @@ Chạy được khi không có mạng, không cần tài khoản, tiến độ h
 - **Điền từ vào câu**: đọc câu ví dụ có chỗ trống, gõ từ còn thiếu.
 - **Nghe & chép chính tả**: có nút nghe chậm và gợi ý.
 - **Luyện nói**: máy nhận giọng nói rồi chấm điểm từng từ (cần Chrome/Edge/Safari và có mạng).
-- **Mục tiêu XP, chuỗi ngày học liên tiếp 🔥, thống kê 14 ngày**, tiến độ theo chủ đề.
+- **Mục tiêu XP, chuỗi ngày học liên tiếp 🔥** (mỗi 7 ngày được nghỉ 1 ngày mà không mất chuỗi), **thống kê 14 ngày**, tiến độ theo trình độ và chủ đề.
+- **Đồng bộ giữa điện thoại và máy tính** qua một gist bí mật trên tài khoản GitHub của bạn (xem bên dưới).
+- Báo **"Có phiên bản mới"** khi app được cập nhật.
 - **1.135 từ vựng theo 4 trình độ** (A1 240 · A2 346 · B1 291 · B2 258) và 19 chủ đề, cùng 60 câu giao tiếp. Chọn trình độ trong Cài đặt; học hết thì app tự chuyển lên trình độ tiếp theo.
 - Chế độ sáng/tối, phím tắt trên máy tính (Space, 1–4, Enter), sao lưu/nhập dữ liệu.
 
@@ -38,7 +40,16 @@ Muốn cài được lên điện thoại thì app phải chạy qua **HTTPS**. 
 | iPhone/iPad (Safari) | Mở link, bấm **Chia sẻ** → *Thêm vào MH chính* |
 | Windows/Mac/Linux (Chrome, Edge) | Mở link, bấm biểu tượng cài đặt ⊕ ở thanh địa chỉ |
 
-Mỗi thiết bị lưu tiến độ riêng. Để chuyển tiến độ sang máy khác, vào **Cài đặt → Xuất tệp** ở máy cũ, rồi **Nhập tệp** ở máy mới.
+## Đồng bộ tiến độ giữa các thiết bị
+1. Mở https://github.com/settings/tokens/new?scopes=gist&description=Fong%20English (quyền **gist** đã được chọn sẵn).
+2. Chọn thời hạn (*Expiration*), bấm **Generate token**, sao chép mã `ghp_...`.
+3. Trong app: **Cài đặt → Đồng bộ giữa các thiết bị**, dán mã, bấm **Kết nối**.
+4. Làm tương tự trên máy còn lại (dùng chung một mã cũng được).
+
+App tự đồng bộ sau mỗi lần học, khi mở app và khi có mạng trở lại. Dữ liệu nằm trong gist bí mật tên *Fong English – dữ liệu đồng bộ tiến độ học*.
+Cách ghép dữ liệu: thẻ từ lấy bản được ôn gần nhất; XP và số từ mỗi ngày được cộng từ tất cả các máy; cài đặt lấy bản sửa sau cùng.
+
+Không muốn đồng bộ? Vẫn có thể chuyển tiến độ bằng **Cài đặt → Xuất tệp** ở máy cũ rồi **Nhập tệp** ở máy mới.
 
 ## Thêm từ vựng
 - A1 nằm trong `js/data.js`; A2, B1, B2 nằm trong `js/words-a2.js`, `js/words-b1.js`, `js/words-b2.js`.

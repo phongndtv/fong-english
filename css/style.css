@@ -202,3 +202,13 @@ select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); 
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 @media (min-width: 900px) { .toast { bottom: 32px; } }
+
+.update-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 60;
+  top: calc(12px + env(safe-area-inset-top)); width: calc(100% - 32px); max-width: 480px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
+  border-radius: 14px; padding: 8px 8px 8px 16px; font-weight: 600;
+}
+.update-bar .btn { min-height: 40px; padding: 8px 14px; }
+code { font-size: .9em; background: var(--bg); padding: 1px 5px; border-radius: 5px; }

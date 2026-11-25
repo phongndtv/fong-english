@@ -36,14 +36,17 @@ const STORE = 'fong-english-v1';
 const DEF = {
   settings: { newPerDay: 10, goalXP: 50, rate: 0.9, voice: '', topics: [], theme: 'auto', level: 'A1', typing: true },
   cards: {},   // id -> { r: số lần nhớ liên tiếp, e: hệ số dễ, i: khoảng cách (ngày), d: ngày đến hạn, l: số lần quên }
-  log: {},     // ngày -> { xp, n: từ mới, r: lượt ôn, g: đã đạt mục tiêu }
+  log: {},     // ngày -> { xp, n: từ mới, r: lượt ôn, g: đã đạt mục tiêu } — chỉ của máy này
+  remote: {},  // mã máy khác -> nhật ký của máy đó (nhận về khi đồng bộ)
+  settingsT: 0, // thời điểm sửa cài đặt gần nhất, để biết bản cài đặt nào mới hơn khi đồng bộ
   best: 0
 };
 let S = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE));
-    if (s) return { settings: { ...DEF.settings, ...s.settings }, cards: migrateCards(s.cards || {}), log: s.log || {}, best: s.best || 0 };
+    if (s) return { settings: { ...DEF.settings, ...s.settings }, cards: migrateCards(s.cards || {}), log: s.log || {},
+      remote: s.remote || {}, settingsT: s.settingsT || 0, best: s.best || 0 };
   } catch (e) { /* dữ liệu hỏng: bắt đầu lại */ }
   return JSON.parse(JSON.stringify(DEF));
 }
@@ -57,23 +60,40 @@ function migrateCards(cards) {
   }
   return out;
 }
-function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { toast('Không lưu được tiến độ'); } }
+function save(sync = true) {
+  try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { toast('Không lưu được tiến độ'); }
+  if (sync) scheduleSync();
+}
 
 function todayLog() { const d = dayNum(); return S.log[d] || (S.log[d] = { xp: 0, n: 0, r: 0 }); }
+// Tổng của một ngày trên mọi thiết bị đã đồng bộ.
+function dayStat(d) {
+  const parts = [S.log[d], ...Object.values(S.remote).map(l => l?.[d])].filter(Boolean);
+  const sum = k => parts.reduce((a, p) => a + (p[k] || 0), 0);
+  const xp = sum('xp');
+  return { xp, n: sum('n'), r: sum('r'), g: parts.some(p => p.g) || xp >= S.settings.goalXP };
+}
+const today = () => dayStat(dayNum());
 function addXP(n) {
   const l = todayLog();
   l.xp += n;
-  if (!l.g && l.xp >= S.settings.goalXP) {
+  if (!l.g && today().xp >= S.settings.goalXP) {
     l.g = 1;
     S.best = Math.max(S.best, streak());
     setTimeout(() => toast('🎉 Bạn đã hoàn thành mục tiêu hôm nay!'), 400);
   }
   save();
 }
+// Chuỗi ngày đạt mục tiêu. Cứ 7 ngày được "nghỉ phép" 1 ngày mà không mất chuỗi.
 function streak() {
-  let d = dayNum(), s = 0;
-  if (!S.log[d]?.g) d--;
-  while (S.log[d]?.g) { s++; d--; }
+  const met = d => dayStat(d).g;
+  let d = dayNum(), s = 0, lastFreeze = -99;
+  if (!met(d)) d--;
+  while (true) {
+    if (met(d)) { s++; d--; }
+    else if (met(d - 1) && s - lastFreeze >= 7 && (s > 0 || d === dayNum() - 1)) { lastFreeze = s; d--; }
+    else break;
+  }
   return s;
 }
 const dueCards = () => { const t = dayNum(); return Object.keys(S.cards).filter(id => WORD[id] && S.cards[id].d <= t); };
@@ -84,10 +104,13 @@ const status = id => { const c = S.cards[id]; return !c ? 'new' : c.i >= 21 ? 'k
 function schedule(id, q) {
   const t = dayNum();
   const c = S.cards[id] || (S.cards[id] = { r: 0, e: 2.5, i: 0, d: t, l: 0 });
+  c.t = Date.now();
   if (q === 0) {
     c.l++; c.r = 0; c.i = 0; c.d = t; c.e = Math.max(1.3, c.e - 0.2);
     return c;
   }
+  // Lần đầu thấy "Khó": chưa tính là nhớ, đưa vào ôn lại ngay trong hôm nay.
+  if (c.r === 0 && q === 1) { c.i = 0; c.d = t; c.e = Math.max(1.3, c.e - 0.15); return c; }
   if (c.r === 0) c.i = [0, 1, 1, 4][q];
   else if (c.r === 1) c.i = [0, 2, 3, 6][q];
   else c.i = Math.max(c.i + 1, Math.round(c.i * [0, 1.2, c.e, c.e * 1.3][q]));
@@ -141,7 +164,7 @@ function applyTheme() {
 
 /* ================= Trang chủ ================= */
 function home() {
-  const l = todayLog(), st = S.settings;
+  const l = today(), st = S.settings;
   const due = dueCards().length;
   const newLeft = Math.max(0, st.newPerDay - l.n);
   const unseen = WORDS.length - learnedWords().length;
@@ -160,6 +183,7 @@ function home() {
         <h1>${hi}! 👋</h1>
         <div class="streak">🔥 ${streak()} ngày liên tiếp</div>
         <div class="muted small">${l.g ? 'Đã đạt mục tiêu hôm nay. Tuyệt vời!' : 'Còn ' + (st.goalXP - l.xp) + ' XP nữa là đạt mục tiêu hôm nay'}</div>
+        <div class="muted small">Mỗi 7 ngày được nghỉ 1 ngày mà không mất chuỗi.</div>
       </div>
     </div>
 
@@ -222,7 +246,7 @@ function bindInstall() {
 
 /* ================= Phiên học thẻ (từ mới & ôn tập) ================= */
 function learn() {
-  const l = todayLog();
+  const l = today();
   const left = S.settings.newPerDay - l.n;
   const unseen = WORDS.filter(w => !S.cards[w.id]);
   const pri = S.settings.topics;
@@ -361,7 +385,7 @@ function cardSession(queue, isNew) {
     render(`${topbar(total, total)}<div class="card center stack">
       <div style="font-size:3rem">🎉</div><h2>Hoàn thành!</h2>
       <p>${isNew ? 'Bạn vừa học <b>' + total + '</b> từ mới' : 'Bạn vừa ôn <b>' + total + '</b> thẻ'}${again ? ', có ' + again + ' lần phải học lại' : ''}.</p>
-      <p class="muted">XP hôm nay: <b>${todayLog().xp}</b> / ${S.settings.goalXP}</p>
+      <p class="muted">XP hôm nay: <b>${today().xp}</b> / ${S.settings.goalXP}</p>
       <a class="btn primary block" href="#/quiz">Kiểm tra nhanh bằng trắc nghiệm</a>
       <a class="btn block" href="#/home">Về trang chủ</a></div>`);
   }
@@ -420,7 +444,7 @@ function quiz() {
       const ok = opts[k].id === w.id;
       $$('.option').forEach((b, j) => { b.disabled = true; if (opts[j].id === w.id) b.classList.add('correct'); else if (j === k) b.classList.add('wrong'); });
       if (ok) { score++; addXP(2); }
-      else if (S.cards[w.id]) { S.cards[w.id].d = dayNum(); save(); }   // trả lời sai: đưa vào ôn lại hôm nay
+      else if (S.cards[w.id]) { Object.assign(S.cards[w.id], { d: dayNum(), t: Date.now() }); save(); }   // trả lời sai: đưa vào ôn lại hôm nay
       $('#fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Chính xác! 🎉' : 'Chưa đúng.'} <b>${esc(w.w)}</b> ${esc(w.ipa)} = ${esc(w.vi)}</div>
         <button class="btn primary block" id="next" style="margin-top:12px">Tiếp tục</button>`;
       if (type === 'vi') say(w.w);
@@ -444,7 +468,7 @@ function resultCard(score, total, again) {
   render(`${topbar(total, total, '#/practice')}<div class="card center stack">
     <div style="font-size:3rem">${p >= .8 ? '🏆' : p >= .5 ? '👍' : '💪'}</div>
     <h2>Đúng ${score}/${total} câu</h2>
-    <p class="muted">${p >= .8 ? 'Xuất sắc!' : p >= .5 ? 'Khá tốt, cố thêm chút nữa!' : 'Đừng nản, luyện thêm là tiến bộ thôi!'} XP hôm nay: ${todayLog().xp}/${S.settings.goalXP}</p>
+    <p class="muted">${p >= .8 ? 'Xuất sắc!' : p >= .5 ? 'Khá tốt, cố thêm chút nữa!' : 'Đừng nản, luyện thêm là tiến bộ thôi!'} XP hôm nay: ${today().xp}/${S.settings.goalXP}</p>
     <a class="btn primary block" href="${again}" id="again">Làm lại</a>
     <a class="btn block" href="#/practice">Bài luyện khác</a></div>`);
   $('#again').onclick = e => { e.preventDefault(); go(); };
@@ -662,11 +686,12 @@ function dict() {
 function stats() {
   const learned = learnedWords();
   const known = learned.filter(w => status(w.id) === 'known').length;
-  const totalXP = Object.values(S.log).reduce((a, l) => a + l.xp, 0);
-  const days = Object.values(S.log).filter(l => l.xp > 0).length;
+  const allDays = new Set([S.log, ...Object.values(S.remote)].flatMap(l => Object.keys(l || {})));
+  const totalXP = [...allDays].reduce((a, d) => a + dayStat(d).xp, 0);
+  const days = [...allDays].filter(d => dayStat(d).xp > 0).length;
   const t = dayNum();
   const range = Array.from({ length: 14 }, (_, k) => t - 13 + k);
-  const max = Math.max(S.settings.goalXP, ...range.map(d => S.log[d]?.xp || 0));
+  const max = Math.max(S.settings.goalXP, ...range.map(d => dayStat(d).xp));
   render(`<h1>Thống kê</h1>
     <div class="grid">
       <div class="card"><div class="muted small">Chuỗi hiện tại</div><div class="stat-num">🔥 ${streak()}</div><div class="muted small">Kỷ lục: ${Math.max(S.best, streak())} ngày</div></div>
@@ -675,7 +700,7 @@ function stats() {
       <div class="card"><div class="muted small">Tổng XP</div><div class="stat-num">${totalXP}</div><div class="muted small">${days} ngày có học</div></div>
     </div>
     <div class="card"><h2>XP 14 ngày qua</h2>
-      <div class="bars">${range.map(d => { const x = S.log[d]?.xp || 0; return `<div class="b ${S.log[d]?.g ? 'met' : ''}" title="${dayLabel(d)}: ${x} XP"><i style="height:${x / max * 100}%"></i><span>${dayLabel(d).split('/')[0]}</span></div>`; }).join('')}</div>
+      <div class="bars">${range.map(d => { const x = dayStat(d).xp; return `<div class="b ${dayStat(d).g ? 'met' : ''}" title="${dayLabel(d)}: ${x} XP"><i style="height:${x / max * 100}%"></i><span>${dayLabel(d).split('/')[0]}</span></div>`; }).join('')}</div>
       <p class="muted small">Cột xanh lá = ngày đạt mục tiêu ${S.settings.goalXP} XP.</p></div>
     <div class="card"><h2>Tiến độ theo trình độ</h2>
       ${LEVELS.filter(l => LEVEL_IDS.includes(l.id)).map(l => progressRow(l.name, WORDS.filter(w => w.level === l.id))).join('')}
@@ -725,16 +750,17 @@ function settings() {
       <h2>Giao diện</h2>
       <div class="field"><label for="th">Chế độ màu</label><select id="th">${opt(['auto', 'light', 'dark'], st.theme, v => ({ auto: 'Theo hệ thống', light: 'Sáng', dark: 'Tối' })[v])}</select></div>
     </div>
+    <div class="card stack" id="syncCard">${syncCardHTML()}</div>
     <div class="card stack">
       <h2>Sao lưu dữ liệu</h2>
-      <p class="muted small">Tiến độ lưu ngay trên thiết bị này. Để chuyển sang máy khác: bấm Xuất ở máy cũ, gửi tệp sang máy mới rồi bấm Nhập.</p>
+      <p class="muted small">Tiến độ lưu ngay trên thiết bị này. Nếu không dùng đồng bộ, có thể chuyển sang máy khác bằng cách Xuất tệp ở máy cũ rồi Nhập ở máy mới.</p>
       <div class="row"><button class="btn" id="exp" style="flex:1">⬇️ Xuất tệp</button><button class="btn" id="imp" style="flex:1">⬆️ Nhập tệp</button></div>
       <input type="file" id="file" accept="application/json,.json" class="hidden">
       <button class="btn ghost block" id="reset" style="color:var(--bad)">Xóa toàn bộ tiến độ</button>
     </div>
     <p class="muted small center">Fong English · ${WORDS.length} từ vựng (${LEVEL_IDS.join(', ')}) · ${PHRASES.length} câu giao tiếp</p>`);
 
-  const set = (k, v) => { st[k] = v; save(); };
+  const set = (k, v) => { st[k] = v; S.settingsT = Date.now(); save(); };
   $('#np').onchange = e => set('newPerDay', +e.target.value);
   $('#gx').onchange = e => set('goalXP', +e.target.value);
   $('#lv').onchange = e => { set('level', e.target.value); settings(); };
@@ -745,7 +771,7 @@ function settings() {
   $('#th').onchange = e => { set('theme', e.target.value); applyTheme(); };
   $$('.checks input').forEach(c => c.onchange = () => set('topics', $$('.checks input:checked').map(x => x.value)));
   $('#exp').onclick = () => {
-    const blob = new Blob([JSON.stringify(S)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ ...S, dev: SY.dev })], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'fong-english-' + new Date().toISOString().slice(0, 10) + '.json';
@@ -757,15 +783,157 @@ function settings() {
       const d = JSON.parse(await e.target.files[0].text());
       if (!d.cards || !d.log) throw new Error();
       if (!confirm('Thay tiến độ hiện tại bằng dữ liệu trong tệp?')) return;
+      // Nhật ký trong tệp thuộc về máy đã xuất: giữ nó như nhật ký của máy đó, tránh cộng XP hai lần khi đồng bộ.
+      if (d.dev && d.dev !== SY.dev) {
+        d.remote = { ...(d.remote || {}), [d.dev]: d.log };
+        d.log = d.remote[SY.dev] || {};
+        delete d.remote[SY.dev];
+      }
+      delete d.dev;
       localStorage.setItem(STORE, JSON.stringify(d));
       S = load(); applyTheme(); toast('Đã nhập dữ liệu'); settings();
     } catch (err) { toast('Tệp không hợp lệ'); }
   };
   $('#reset').onclick = () => {
-    if (!confirm('Xóa toàn bộ tiến độ học? Không thể hoàn tác.')) return;
+    if (!confirm(SY.token
+      ? 'Máy này đang đồng bộ, nên tiến độ sẽ được tải lại từ GitHub ở lần đồng bộ sau. Muốn xóa hẳn, hãy Ngắt kết nối rồi xóa gist "Fong English" trên GitHub. Vẫn xóa tiến độ trên máy này?'
+      : 'Xóa toàn bộ tiến độ học? Không thể hoàn tác.')) return;
     localStorage.removeItem(STORE); S = load(); applyTheme(); toast('Đã xóa tiến độ'); settings();
   };
+  bindSyncCard();
   if (!voices.length && 'speechSynthesis' in window) setTimeout(() => { if (voices.length && route() === 'settings') settings(); }, 600);
+}
+
+/* ================= Đồng bộ qua GitHub Gist ================= */
+// Dữ liệu được lưu trong một gist bí mật trên tài khoản GitHub của người dùng.
+// Mã truy cập và mã máy chỉ nằm trên từng máy, không có trong tệp sao lưu.
+const SYNC_KEY = 'fong-english-sync';   // { token, user, gistId, dev, last, err }
+const SYNC_FILE = 'fong-english-sync.json';
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=Fong%20English';
+let SY = {};
+try { SY = JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { /* bỏ qua */ }
+if (!SY.dev) { SY.dev = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); saveSync(); }
+function saveSync() { try { localStorage.setItem(SYNC_KEY, JSON.stringify(SY)); } catch (e) { /* bỏ qua */ } }
+
+async function gh(path, opts = {}) {
+  const r = await fetch('https://api.github.com' + path, {
+    ...opts,
+    cache: 'no-store',
+    headers: { Authorization: 'Bearer ' + SY.token, Accept: 'application/vnd.github+json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) }
+  });
+  if (r.status === 401) throw new Error('auth');
+  if (!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+function syncDoc() {
+  return { v: 1, cards: S.cards, settings: S.settings, settingsT: S.settingsT, best: S.best, logs: { ...S.remote, [SY.dev]: S.log } };
+}
+function mergeRemote(r) {
+  for (const [id, c] of Object.entries(migrateCards(r.cards || {}))) {
+    const mine = S.cards[id];
+    if (!mine || (c.t || 0) > (mine.t || 0)) S.cards[id] = c;   // giữ bản ôn gần nhất
+  }
+  S.remote = {};
+  for (const [dev, log] of Object.entries(r.logs || {})) if (dev !== SY.dev) S.remote[dev] = log;
+  if ((r.settingsT || 0) > (S.settingsT || 0)) { S.settings = { ...DEF.settings, ...r.settings }; S.settingsT = r.settingsT; applyTheme(); }
+  S.best = Math.max(S.best, r.best || 0);
+}
+let syncing = null, syncTimer = null;
+function scheduleSync() {
+  if (!SY.token) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 5000);
+}
+function syncNow() {
+  clearTimeout(syncTimer); syncTimer = null;
+  if (!SY.token) return Promise.resolve();
+  return syncing || (syncing = doSync().finally(() => { syncing = null; }));
+}
+async function doSync() {
+  try {
+    if (!navigator.onLine) throw new Error('offline');
+    if (!SY.gistId) {
+      const list = await gh('/gists?per_page=100');
+      SY.gistId = list.find(g => g.files[SYNC_FILE])?.id || null;
+    }
+    if (SY.gistId) {
+      let g = null;
+      try { g = await gh('/gists/' + SY.gistId); } catch (e) { if (e.message !== 'http 404') throw e; SY.gistId = null; }
+      const f = g?.files[SYNC_FILE];
+      if (f) mergeRemote(JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content));
+    }
+    const files = { [SYNC_FILE]: { content: JSON.stringify(syncDoc()) } };
+    if (SY.gistId) await gh('/gists/' + SY.gistId, { method: 'PATCH', body: JSON.stringify({ files }) });
+    else SY.gistId = (await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Fong English – dữ liệu đồng bộ tiến độ học', public: false, files }) })).id;
+    SY.last = Date.now(); SY.err = '';
+    save(false);
+    // Vẽ lại các trang chỉ hiển thị số liệu; không làm gián đoạn khi đang học.
+    if (['home', 'stats', 'dict'].includes(route())) go();
+  } catch (e) {
+    SY.err = e.message;
+  }
+  saveSync();
+  const card = $('#syncCard'); if (card) { card.innerHTML = syncCardHTML(); bindSyncCard(); }
+}
+function syncStatus() {
+  if (syncing) return '⏳ Đang đồng bộ...';
+  if (SY.err === 'auth') return '⚠️ Mã truy cập không hợp lệ hoặc đã hết hạn. Hãy ngắt kết nối và tạo mã mới.';
+  if (SY.err === 'offline') return '📴 Không có mạng, sẽ đồng bộ lại khi có mạng.';
+  if (SY.err) return '⚠️ Chưa đồng bộ được (' + esc(SY.err) + '), sẽ thử lại sau.';
+  return SY.last ? '✅ Đồng bộ lần cuối lúc ' + new Date(SY.last).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Chưa đồng bộ lần nào.';
+}
+function syncCardHTML() {
+  if (SY.token) return `<h2>Đồng bộ giữa các thiết bị</h2>
+    <p>Đã kết nối với GitHub <b>${esc(SY.user || '')}</b>.</p>
+    <p class="muted small">${syncStatus()}</p>
+    <p class="muted small">Tiến độ tự đồng bộ sau mỗi lần học và khi mở app. Dùng cùng mã truy cập trên các máy khác để học tiếp ở đó.</p>
+    <div class="row"><button class="btn primary" id="syncNow" style="flex:1">🔄 Đồng bộ ngay</button><button class="btn" id="syncOff">Ngắt kết nối</button></div>`;
+  return `<h2>Đồng bộ giữa các thiết bị</h2>
+    <p class="muted small">Học trên điện thoại rồi học tiếp trên máy tính. Tiến độ được lưu trong một gist bí mật trên tài khoản GitHub của bạn, miễn phí.</p>
+    <ol class="small" style="padding-left:20px;margin:0">
+      <li>Mở <a href="${TOKEN_URL}" target="_blank" rel="noopener">trang tạo mã truy cập GitHub</a> (đã chọn sẵn quyền <b>gist</b>).</li>
+      <li>Ở mục <i>Expiration</i> chọn <b>No expiration</b> (hoặc thời hạn bạn muốn), rồi bấm <b>Generate token</b> ở cuối trang.</li>
+      <li>Sao chép mã (bắt đầu bằng <code>ghp_</code>), dán vào ô dưới đây rồi bấm Kết nối.</li>
+      <li>Làm tương tự trên máy kia, có thể dùng chung một mã.</li>
+    </ol>
+    <input class="input" id="tok" type="password" autocomplete="off" placeholder="ghp_..." spellcheck="false">
+    <button class="btn primary block" id="syncOn">Kết nối</button>
+    <p class="muted small">Mã chỉ lưu trên máy này và chỉ có quyền đọc/ghi gist. Đừng chia sẻ mã cho người khác.</p>`;
+}
+function bindSyncCard() {
+  const on = $('#syncOn'), now = $('#syncNow'), off = $('#syncOff');
+  if (on) on.onclick = async () => {
+    const tok = $('#tok').value.trim();
+    if (!tok) return toast('Hãy dán mã truy cập');
+    on.disabled = true; on.textContent = 'Đang kiểm tra...';
+    SY.token = tok;
+    try {
+      const u = await gh('/user');
+      SY.user = u.login; SY.gistId = null; SY.err = ''; saveSync();
+      toast('Đã kết nối GitHub ' + u.login);
+      await syncNow();
+    } catch (e) {
+      delete SY.token; saveSync();
+      toast(e.message === 'auth' ? 'Mã truy cập không đúng' : 'Không kết nối được GitHub, kiểm tra mạng');
+      on.disabled = false; on.textContent = 'Kết nối';
+    }
+  };
+  if (now) now.onclick = () => { now.disabled = true; now.textContent = '⏳ Đang đồng bộ...'; syncNow(); };
+  if (off) off.onclick = () => {
+    if (!confirm('Ngắt đồng bộ trên máy này? Tiến độ trên máy và trên GitHub vẫn được giữ nguyên.')) return;
+    SY = { dev: SY.dev }; saveSync();
+    const card = $('#syncCard'); card.innerHTML = syncCardHTML(); bindSyncCard();
+  };
+}
+
+/* ================= Cập nhật phiên bản ================= */
+function showUpdateBanner() {
+  if ($('#updateBar')) return;
+  const b = document.createElement('div');
+  b.id = 'updateBar'; b.className = 'update-bar';
+  b.innerHTML = '<span>✨ Có phiên bản mới</span><button class="btn primary">Cập nhật</button>';
+  b.querySelector('button').onclick = () => location.reload();
+  document.body.append(b);
 }
 
 /* ================= Điều hướng ================= */
@@ -784,10 +952,23 @@ window.addEventListener('hashchange', go);
 // Sang ngày mới khi app vẫn mở: vẽ lại trang chủ.
 let lastDay = dayNum();
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && dayNum() !== lastDay) { lastDay = dayNum(); if (route() === 'home') home(); }
+  if (document.visibilityState === 'visible') {
+    if (dayNum() !== lastDay) { lastDay = dayNum(); if (route() === 'home') home(); }
+    syncNow();                       // lấy tiến độ mới từ máy khác
+    swReg?.update();                 // kiểm tra bản mới
+  } else if (syncTimer) syncNow();   // sắp rời app: đẩy tiến độ chưa đồng bộ lên
 });
+window.addEventListener('online', () => syncNow());
 
+let swReg = null;
 applyTheme();
 go();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+syncNow();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // Service worker mới tiếp quản (đã có bản mới trong bộ nhớ đệm) → mời tải lại.
+  // Lần đầu cài (chưa có service worker nào điều khiển trang) thì không cần báo.
+  let controlled = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (controlled) showUpdateBanner(); controlled = true; });
+  navigator.serviceWorker.register('sw.js').then(r => { swReg = r; });
+}
 if (navigator.storage?.persist) navigator.storage.persist();
