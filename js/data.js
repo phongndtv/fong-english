@@ -2,13 +2,14 @@
 // Mỗi từ: [từ, phiên âm, loại từ, nghĩa, câu ví dụ, nghĩa câu ví dụ]
 // Loại từ: n = danh từ, v = động từ, adj = tính từ, adv = trạng từ, phr = cụm từ
 // Tiến độ học được lưu theo chính từ tiếng Anh, nên có thể thêm/xóa/sắp xếp lại thoải mái.
-// Từ vựng các trình độ A2, B1, B2 nằm ở js/words-a2.js, words-b1.js, words-b2.js.
+// Từ vựng các trình độ A2, B1, B2 nằm ở js/words-a2.js, words-b1.js, words-b2.js; học thuật ở js/words-ac.js.
 
 const LEVELS = [
   { id: 'A1', name: 'A1 · Sơ cấp', desc: 'Từ vựng nền tảng cho giao tiếp hằng ngày' },
   { id: 'A2', name: 'A2 · Cơ bản', desc: 'Mở rộng chủ đề quen thuộc, diễn đạt nhu cầu đơn giản' },
   { id: 'B1', name: 'B1 · Trung cấp', desc: 'Công việc, du lịch, bày tỏ ý kiến' },
-  { id: 'B2', name: 'B2 · Trung cao cấp', desc: 'Tin tức, xã hội, thảo luận sâu hơn' }
+  { id: 'B2', name: 'B2 · Trung cao cấp', desc: 'Tin tức, xã hội, thảo luận sâu hơn' },
+  { id: 'AC', name: 'Học thuật · Viết bài báo khoa học', desc: 'Từ vựng học thuật dùng trong bài báo khoa học quốc tế' }
 ];
 
 const TOPICS = [
@@ -30,7 +31,15 @@ const TOPICS = [
   { id: 'nature', name: 'Thiên nhiên & môi trường', icon: '🌿' },
   { id: 'money', name: 'Tiền bạc & kinh tế', icon: '💰' },
   { id: 'society', name: 'Xã hội & tin tức', icon: '📰' },
-  { id: 'connectors', name: 'Từ nối & diễn đạt', icon: '🔗' }
+  { id: 'connectors', name: 'Từ nối & diễn đạt', icon: '🔗' },
+  // Chủ đề học thuật (trình độ AC, js/words-ac.js)
+  { id: 'ac-research', name: 'HT · Nghiên cứu & phương pháp', icon: '🔬' },
+  { id: 'ac-data', name: 'HT · Dữ liệu & phân tích', icon: '📈' },
+  { id: 'ac-argument', name: 'HT · Lập luận & bằng chứng', icon: '⚖️' },
+  { id: 'ac-change', name: 'HT · Thay đổi & xu hướng', icon: '📉' },
+  { id: 'ac-compare', name: 'HT · So sánh & mức độ', icon: '🔀' },
+  { id: 'ac-reporting', name: 'HT · Động từ trích dẫn', icon: '🗣️' },
+  { id: 'ac-linking', name: 'HT · Liên kết văn bản', icon: '🧷' }
 ];
 
 // VOCAB[trình độ][chủ đề] = danh sách từ

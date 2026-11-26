@@ -13,7 +13,12 @@ Chạy được khi không có mạng, không cần tài khoản, tiến độ h
 - **Mục tiêu XP, chuỗi ngày học liên tiếp 🔥** (mỗi 7 ngày được nghỉ 1 ngày mà không mất chuỗi), **thống kê 14 ngày**, tiến độ theo trình độ và chủ đề.
 - **Đồng bộ giữa điện thoại và máy tính** qua một gist bí mật trên tài khoản GitHub của bạn (xem bên dưới).
 - Báo **"Có phiên bản mới"** khi app được cập nhật.
-- **1.135 từ vựng theo 4 trình độ** (A1 240 · A2 346 · B1 291 · B2 258) và 19 chủ đề, cùng 60 câu giao tiếp. Chọn trình độ trong Cài đặt; học hết thì app tự chuyển lên trình độ tiếp theo.
+- **1.446 từ vựng**: 4 trình độ giao tiếp (A1 240 · A2 346 · B1 291 · B2 258, 19 chủ đề) và 311 từ học thuật, cùng 60 câu giao tiếp. Chọn trình độ trong Cài đặt; học hết thì app tự chuyển lên trình độ tiếp theo.
+- **🎓 Tiếng Anh học thuật** cho người viết bài báo khoa học quốc tế (tab *Học thuật*):
+  - từ vựng học thuật (trình độ *AC*, 7 chủ đề: phương pháp, dữ liệu, lập luận, xu hướng, so sánh, động từ trích dẫn, liên kết), học và ôn bằng thẻ như các trình độ khác;
+  - mẫu câu theo từng phần bài báo (Tóm tắt, Mở đầu, Tổng quan, Phương pháp, Kết quả, Thảo luận, Kết luận, thư gửi tạp chí và phản hồi phản biện), kèm lưu ý về thì và cấu trúc, tìm kiếm và nút chép;
+  - văn phong trang trọng, cách rào đón (hedging), lỗi người Việt hay mắc;
+  - bài luyện: hoàn thành mẫu câu, nhận biết phần của bài báo, chọn cách viết trang trọng, chọn câu viết đúng.
 - Chế độ sáng/tối, phím tắt trên máy tính (Space, 1–4, Enter), sao lưu/nhập dữ liệu.
 
 ## Chạy thử trên máy tính
@@ -55,6 +60,8 @@ Không muốn đồng bộ? Vẫn có thể chuyển tiến độ bằng **Cài 
 - A1 nằm trong `js/data.js`; A2, B1, B2 nằm trong `js/words-a2.js`, `js/words-b1.js`, `js/words-b2.js`.
 - Mỗi dòng: `["từ", "/phiên âm/", "loại từ", "nghĩa", "Câu ví dụ.", "Nghĩa câu ví dụ."]`. Câu ví dụ nên chứa đúng từ đó để dùng được cho bài điền từ.
 - Tiến độ học lưu theo chính từ tiếng Anh, nên có thể thêm, xóa, sắp xếp lại tùy ý. Nếu một từ có ở nhiều trình độ, app dùng trình độ thấp nhất.
+- Từ vựng học thuật nằm trong `js/words-ac.js`; mẫu câu, văn phong và lỗi thường gặp nằm trong `js/academic.js` (trong mẫu câu, từ khóa đặt giữa hai dấu `*` để làm bài điền từ).
+
 Sau khi sửa, tăng `VERSION` trong `sw.js` (ví dụ `fong-english-v2`) để máy đã cài nhận được bản mới.
 
 ## Cấu trúc
@@ -63,6 +70,8 @@ index.html            khung trang
 css/style.css         giao diện (tự co giãn theo điện thoại/máy tính, có chế độ tối)
 js/data.js            trình độ, chủ đề, từ vựng A1 và câu giao tiếp
 js/words-a2/b1/b2.js  từ vựng các trình độ A2, B1, B2
+js/words-ac.js        từ vựng học thuật
+js/academic.js        mẫu câu bài báo khoa học, văn phong, lỗi thường gặp
 js/app.js             toàn bộ chức năng
 sw.js                 service worker giúp chạy offline
 manifest.webmanifest  thông tin để cài app

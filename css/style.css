@@ -212,3 +212,13 @@ select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); 
 }
 .update-bar .btn { min-height: 40px; padding: 8px 14px; }
 code { font-size: .9em; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+
+/* Học thuật */
+.tips { margin: 8px 0 0; padding-left: 20px; }
+.tips li { margin: 4px 0; font-size: .9rem; }
+.line-bad { color: var(--bad); }
+.line-good { color: var(--good); margin-top: 2px; }
+.line-bad b, .line-good b { text-decoration: underline; text-underline-offset: 3px; }
+.phr .item > .grow b { color: var(--primary); }
+.wlist .item .line-bad b { color: var(--bad); }
+.wlist .item .line-good b { color: var(--good); }

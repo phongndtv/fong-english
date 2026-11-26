@@ -236,6 +236,11 @@ function home() {
       <div class="grow"><b>Luyện tập</b><div class="muted small">Trắc nghiệm · Nghe chép · Luyện nói</div></div>
       <div class="chev">›</div>
     </a>
+    <a class="card task" href="#/academic">
+      <div class="ic">🎓</div>
+      <div class="grow"><b>Tiếng Anh học thuật</b><div class="muted small">Viết bài báo khoa học: từ vựng, mẫu câu, văn phong</div></div>
+      <div class="chev">›</div>
+    </a>
 
     <h2>Từ của ngày</h2>
     <div class="card">
@@ -276,15 +281,17 @@ function bindInstall() {
 }
 
 /* ================= Phiên học thẻ (từ mới & ôn tập) ================= */
-function learn() {
+// only: chỉ học từ của một trình độ (vd. 'AC' từ trang Học thuật).
+function learn(only) {
   const l = today();
   const left = S.settings.newPerDay - l.n;
-  const unseen = WORDS.filter(w => !S.cards[w.id]);
+  const unseen = WORDS.filter(w => !S.cards[w.id] && (!only || w.level === only));
   const pri = S.settings.topics;
   // Thứ tự: trình độ đang chọn → các trình độ cao hơn → thấp hơn; trong cùng trình độ ưu tiên chủ đề đã chọn.
   const lv = Math.max(0, LEVEL_IDS.indexOf(S.settings.level));
   const rank = w => { const d = LEVEL_IDS.indexOf(w.level) - lv; return d >= 0 ? d : LEVEL_IDS.length - d; };
   unseen.sort((a, b) => rank(a) - rank(b) || pri.includes(b.topic) - pri.includes(a.topic));
+  if (!unseen.length && only) return emptyState('🏆', 'Bạn đã học hết từ vựng học thuật!', 'Hãy ôn tập mỗi ngày và luyện mẫu câu viết bài báo.', '#/academic', 'Về trang Học thuật');
   if (!unseen.length) return emptyState('🏆', 'Bạn đã học hết ' + WORDS.length + ' từ!', 'Hãy tiếp tục ôn tập mỗi ngày để nhớ lâu.', '#/review', 'Ôn tập');
   if (left <= 0) {
     render(`${topbar(0, 0)}<div class="card center stack">
@@ -494,14 +501,14 @@ function quiz() {
   }
   show();
 }
-function resultCard(score, total, again) {
+function resultCard(score, total, again, back = '#/practice') {
   const p = score / total;
-  render(`${topbar(total, total, '#/practice')}<div class="card center stack">
+  render(`${topbar(total, total, back)}<div class="card center stack">
     <div style="font-size:3rem">${p >= .8 ? '🏆' : p >= .5 ? '👍' : '💪'}</div>
     <h2>Đúng ${score}/${total} câu</h2>
     <p class="muted">${p >= .8 ? 'Xuất sắc!' : p >= .5 ? 'Khá tốt, cố thêm chút nữa!' : 'Đừng nản, luyện thêm là tiến bộ thôi!'} XP hôm nay: ${today().xp}/${S.settings.goalXP}</p>
     <a class="btn primary block" href="${again}" id="again">Làm lại</a>
-    <a class="btn block" href="#/practice">Bài luyện khác</a></div>`);
+    <a class="btn block" href="${back}">Bài luyện khác</a></div>`);
   $('#again').onclick = e => { e.preventDefault(); go(); };
 }
 
@@ -711,6 +718,224 @@ function dict() {
   $$('#chips .chip').forEach(c => c.onclick = () => { dictTopic = c.dataset.t; $$('#chips .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
   $$('#levels .chip').forEach(c => c.onclick = () => { dictLevel = c.dataset.l; $$('#levels .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
   draw();
+}
+
+/* ================= Tiếng Anh học thuật ================= */
+// Mẫu câu: từ khóa nằm giữa hai dấu * (xem js/academic.js).
+const AC_PHRASES = ACADEMIC.sections.flatMap(sec => sec.moves.flatMap(m => m.phrases.map(([en, vi]) => ({ en, vi, sec, move: m.name }))));
+const plain = s => s.replace(/\*/g, '');
+const markKey = s => esc(s).replace(/\*([^*]+)\*/g, '<b>$1</b>');
+const keyOf = s => /\*([^*]+)\*/.exec(s)[1];
+// In đậm đoạn con (không phân biệt hoa thường) trong câu.
+function markPart(sentence, part) {
+  const at = sentence.toLowerCase().indexOf(part.toLowerCase());
+  if (at < 0) return esc(sentence);
+  return esc(sentence.slice(0, at)) + '<b>' + esc(sentence.slice(at, at + part.length)) + '</b>' + esc(sentence.slice(at + part.length));
+}
+const pageHead = (title, back = '#/academic') =>
+  `<div class="topbar"><a href="${back}" class="back" aria-label="Quay lại">‹</a><h1 style="margin:0;font-size:1.2rem">${title}</h1></div>`;
+function copyText(text) {
+  navigator.clipboard?.writeText(text).then(() => toast('Đã chép mẫu câu'), () => toast('Không chép được'));
+}
+
+function academic() {
+  const words = WORDS.filter(w => w.level === 'AC');
+  const learned = words.filter(w => S.cards[w.id]).length;
+  const pod = AC_PHRASES[(dayNum() * 7907) % AC_PHRASES.length];
+  const task = (href, ic, title, sub) => `<a class="card task" href="${href}"><div class="ic">${ic}</div>
+    <div class="grow"><b>${title}</b><div class="muted small">${sub}</div></div><div class="chev">›</div></a>`;
+  render(`<h1>🎓 Tiếng Anh học thuật</h1>
+    <p class="muted">Dành cho người viết bài báo khoa học quốc tế: từ vựng học thuật, mẫu câu cho từng phần của bài báo, văn phong trang trọng và các lỗi người Việt hay mắc.</p>
+    ${task('#/aclearn', '📚', 'Học từ vựng học thuật', `Đã học ${learned}/${words.length} từ · thẻ đến hạn được ôn chung ở mục Ôn tập`)}
+    ${task('#/acphrases', '🧩', 'Mẫu câu theo phần bài báo', `${AC_PHRASES.length} mẫu câu · Tóm tắt, Mở đầu, Phương pháp, Kết quả, Thảo luận… · bấm 📋 để chép`)}
+    ${task('#/acstyle', '✒️', 'Văn phong & lỗi thường gặp', `${ACADEMIC.formal.length} cách nói trang trọng · ${ACADEMIC.hedging.length} câu rào đón · ${ACADEMIC.errors.length} lỗi hay gặp`)}
+    <h2>Luyện tập</h2>
+    ${task('#/acfill', '✍️', 'Hoàn thành mẫu câu', 'Gõ từ khóa còn thiếu trong mẫu câu · +3 XP mỗi câu đúng')}
+    ${task('#/acsection', '🗂️', 'Câu này thuộc phần nào?', 'Nhận biết mẫu câu của từng phần bài báo · +2 XP')}
+    ${task('#/acformal', '🎩', 'Chọn cách viết trang trọng', 'Thay từ thân mật bằng từ học thuật · +2 XP')}
+    ${task('#/acerror', '🔍', 'Chọn câu viết đúng', 'Lỗi ngữ pháp, dùng từ và mức độ khẳng định · +2 XP')}
+    <h2>Mẫu câu của ngày</h2>
+    <div class="card row">
+      <button class="icon-btn" data-say="${esc(plain(pod.en))}" aria-label="Nghe">🔊</button>
+      <div class="grow"><div>${markKey(pod.en)}</div><div class="muted small">${esc(pod.vi)}</div>
+        <div class="muted small" style="margin-top:4px">${pod.sec.icon} ${esc(pod.sec.name)} · ${esc(pod.move)}</div></div>
+    </div>`);
+  bindSay();
+}
+
+let acSec = ACADEMIC.sections[0].id, acQuery = '';
+function phraseItem(p, showSec) {
+  return `<div class="item">
+    <button class="icon-btn" data-say="${esc(plain(p.en))}" aria-label="Nghe">🔊</button>
+    <div class="grow"><div>${markKey(p.en)}</div><div class="ex">${esc(p.vi)}</div>
+      ${showSec ? `<div class="ex">${p.sec.icon} ${esc(p.sec.name)} · ${esc(p.move)}</div>` : ''}</div>
+    <button class="icon-btn" data-copy="${esc(plain(p.en))}" aria-label="Chép">📋</button></div>`;
+}
+function acPhrases() {
+  render(`${pageHead('Mẫu câu theo phần bài báo')}
+    <input class="input" id="q" type="search" placeholder="Tìm mẫu câu (tiếng Anh hoặc tiếng Việt)..." value="${esc(acQuery)}">
+    <div class="chips" id="secs">${ACADEMIC.sections.map(s => `<button class="chip ${s.id === acSec ? 'on' : ''}" data-s="${s.id}">${s.icon} ${esc(s.name)}</button>`).join('')}</div>
+    <div id="body"></div>`);
+  const draw = () => {
+    const q = acQuery.trim().toLowerCase();
+    $('#secs').classList.toggle('hidden', !!q);
+    if (q) {
+      const hits = AC_PHRASES.filter(p => plain(p.en).toLowerCase().includes(q) || p.vi.toLowerCase().includes(q));
+      $('#body').innerHTML = `<p class="muted small">${hits.length} mẫu câu</p>` +
+        (hits.length ? `<div class="card wlist phr">${hits.slice(0, 100).map(p => phraseItem(p, true)).join('')}</div>` : '');
+    } else {
+      const sec = ACADEMIC.sections.find(s => s.id === acSec);
+      $('#body').innerHTML = `<div class="card"><h2>${sec.icon} ${esc(sec.name)}</h2><p>${esc(sec.desc)}</p>
+          <ul class="tips">${sec.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+        ${sec.moves.map((m, k) => `<h3 style="margin-top:18px">${k + 1}. ${esc(m.name)}</h3>
+          <div class="card wlist phr">${m.phrases.map(([en, vi]) => phraseItem({ en, vi, sec, move: m.name })).join('')}</div>`).join('')}`;
+    }
+    bindSay();
+    $$('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy));
+  };
+  $('#q').oninput = e => { acQuery = e.target.value; draw(); };
+  $$('#secs .chip').forEach(c => c.onclick = () => { acSec = c.dataset.s; $$('#secs .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); window.scrollTo(0, 0); });
+  draw();
+}
+
+let acTab = 'formal';
+function acStyle() {
+  const tabs = { formal: '🎩 Trang trọng', hedging: '🤔 Rào đón', errors: '🔍 Lỗi thường gặp' };
+  const intro = {
+    formal: 'Bài báo khoa học tránh từ thân mật, cụm động từ (phrasal verb), viết tắt và "you". Cột trái là cách nói thường ngày, cột phải là cách viết học thuật.',
+    hedging: 'Người viết khoa học thận trọng với kết luận: dùng may, suggest, appear, likely… khi bằng chứng chưa tuyệt đối. Nhưng đừng rào đón quá mức khiến kết quả trở nên mơ hồ.',
+    errors: 'Những lỗi người Việt hay mắc khi viết bài báo tiếng Anh. Biên tập viên và phản biện rất dễ nhận ra các lỗi này.'
+  };
+  render(`${pageHead('Văn phong & lỗi thường gặp')}
+    <div class="chips" id="tabs">${Object.entries(tabs).map(([k, v]) => `<button class="chip ${k === acTab ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
+    <div id="body"></div>`);
+  const pair = (bad, good, note) => `<div class="item"><div class="grow">
+      <div class="line-bad">✗ ${bad}</div><div class="line-good">✓ ${good}</div>
+      ${note ? `<div class="ex">${esc(note)}</div>` : ''}</div></div>`;
+  const draw = () => {
+    const rows = acTab === 'formal'
+      ? ACADEMIC.formal.map(([inf, fo, sInf, sFo, note]) => pair(markPart(sInf, inf), markPart(sFo, fo), `${inf} → ${fo}. ${note}`))
+      : ACADEMIC[acTab].map(([bad, good, note]) => pair(esc(bad), esc(good), note));
+    $('#body').innerHTML = `<p class="muted small">${intro[acTab]}</p><div class="card wlist">${rows.join('')}</div>`;
+  };
+  $$('#tabs .chip').forEach(c => c.onclick = () => { acTab = c.dataset.t; $$('#tabs .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
+  draw();
+}
+
+// Bài trắc nghiệm dùng chung cho phần học thuật.
+// Mỗi câu: { prompt (HTML), opts (HTML), ans (vị trí đúng), explain (HTML), say (đọc sau khi trả lời) }
+function acChoice(qs, again, xp) {
+  let i = 0, score = 0;
+  function show() {
+    if (i >= qs.length) { keyHandler = null; return resultCard(score, qs.length, again, '#/academic'); }
+    const q = qs[i];
+    let answered = false;
+    render(`${topbar(i, qs.length, '#/academic')}<div class="card">${q.prompt}
+      <div class="options">${q.opts.map((o, k) => `<button class="btn option" data-k="${k}">${k + 1}. ${o}</button>`).join('')}</div>
+      <div id="fb"></div></div>`);
+    const answer = k => {
+      if (answered) return; answered = true;
+      const ok = k === q.ans;
+      $$('.option').forEach((b, j) => { b.disabled = true; if (j === q.ans) b.classList.add('correct'); else if (j === k) b.classList.add('wrong'); });
+      if (ok) { score++; addXP(xp); }
+      $('#fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Chính xác! 🎉' : 'Chưa đúng.'}<div class="small" style="margin-top:4px">${q.explain}</div></div>
+        <button class="btn primary block" id="next" style="margin-top:12px">Tiếp tục</button>`;
+      if (q.say) say(q.say);
+      $('#next').onclick = next; $('#next').focus();
+    };
+    const next = () => { i++; show(); };
+    $$('.option').forEach(b => b.onclick = () => answer(+b.dataset.k));
+    keyHandler = e => {
+      if (!answered && /^[1-9]$/.test(e.key) && +e.key <= q.opts.length) answer(+e.key - 1);
+      else if (answered && e.key === 'Enter') { e.preventDefault(); next(); }
+    };
+  }
+  show();
+}
+// Trộn đáp án đúng với các phương án nhiễu, trả về { opts, ans }.
+function withDistractors(right, wrongs) {
+  const opts = shuffle([right, ...wrongs]);
+  return { opts, ans: opts.indexOf(right) };
+}
+
+function acSection() {
+  const qs = pick(AC_PHRASES, 10).map(p => {
+    const others = pick(ACADEMIC.sections.filter(s => s !== p.sec), 3);
+    const { opts, ans } = withDistractors(p.sec, others);
+    return {
+      prompt: `<div class="muted center">Mẫu câu này thường nằm ở phần nào của bài báo?</div>
+        <div class="question" style="font-size:1.15rem;line-height:1.5">${esc(plain(p.en))}</div>`,
+      opts: opts.map(s => `${s.icon} ${esc(s.name)}`), ans,
+      explain: `${p.sec.icon} ${esc(p.sec.name)} · ${esc(p.move)}<br>${esc(p.vi)}`, say: plain(p.en)
+    };
+  });
+  acChoice(qs, '#/acsection', 2);
+}
+
+function acFormal() {
+  const qs = pick(ACADEMIC.formal, 10).map(row => {
+    const [inf, fo, sInf, sFo, note] = row;
+    const others = pick(ACADEMIC.formal.filter(r => r !== row), 3).map(r => r[1]);
+    const { opts, ans } = withDistractors(fo, others);
+    return {
+      prompt: `<div class="muted center">Chọn cách viết học thuật thay cho phần in đậm</div>
+        <div class="question" style="font-size:1.15rem;line-height:1.5">${markPart(sInf, inf)}</div>`,
+      opts: opts.map(esc), ans,
+      explain: `${markPart(sFo, fo)}<br>${esc(note)}`, say: sFo
+    };
+  });
+  acChoice(qs, '#/acformal', 2);
+}
+
+function acError() {
+  const items = [
+    ...pick(ACADEMIC.errors, 7).map(r => ({ r, ask: 'Câu nào viết đúng?' })),
+    ...pick(ACADEMIC.hedging, 3).map(r => ({ r, ask: 'Câu nào phù hợp văn phong khoa học hơn?' }))
+  ];
+  const qs = shuffle(items).map(({ r: [bad, good, note], ask }) => {
+    const { opts, ans } = withDistractors(good, [bad]);
+    return { prompt: `<div class="muted center" style="margin-bottom:12px">${ask}</div>`, opts: opts.map(esc), ans, explain: esc(note), say: good };
+  });
+  acChoice(qs, '#/acerror', 2);
+}
+
+function acFill() {
+  const items = pick(AC_PHRASES, 8);
+  let i = 0, score = 0;
+  function show() {
+    if (i >= items.length) { keyHandler = null; return resultCard(score, items.length, '#/acfill', '#/academic'); }
+    const p = items[i], key = keyOf(p.en);
+    const blank = key[0] + '_'.repeat(key.length - 1).split('').join(' ');
+    const [before, after] = p.en.split('*' + key + '*').map(plain);
+    let checked = false;
+    render(`${topbar(i, items.length, '#/academic')}<div class="card stack">
+      <div class="muted center">Điền từ khóa còn thiếu · ${p.sec.icon} ${esc(p.sec.name)}</div>
+      <div class="question" style="font-size:1.2rem;line-height:1.5">${esc(before)}<span style="color:var(--primary);white-space:nowrap">${blank}</span>${esc(after)}</div>
+      <div class="muted center">${esc(p.vi)}</div>
+      <input class="input" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Từ còn thiếu...">
+      <div class="row"><button class="btn ghost" id="hint">Gợi ý</button><button class="btn primary" id="check" style="flex:1">Kiểm tra</button></div>
+      <div id="fb"></div></div>`);
+    $('#hint').onclick = () => { $('#ans').placeholder = `${key.length} chữ cái · ${p.move}`; $('#ans').focus(); };
+    const check = () => {
+      if (checked) { i++; return show(); }
+      checked = true;
+      const typed = norm($('#ans').value), want = norm(key);
+      const ok = typed === want;
+      const close = !ok && editDistance(typed, want) === 1 && want.length > 3;
+      if (ok) { score++; addXP(3); }
+      $('#ans').disabled = true;
+      $('#fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Chính xác! 🎉' : close ? 'Gần đúng, sai 1 chữ. Đáp án:' : 'Đáp án:'} <b>${esc(key)}</b>
+        <div class="small" style="margin-top:4px">${markKey(p.en)}</div></div>`;
+      $('#check').textContent = 'Tiếp tục'; $('#hint').classList.add('hidden');
+      $('#check').focus();
+      say(plain(p.en));
+    };
+    $('#check').onclick = check;
+    $('#ans').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); check(); } };
+    keyHandler = e => { if (checked && e.key === 'Enter' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') { e.preventDefault(); check(); } };
+    setTimeout(() => $('#ans')?.focus(), 50);
+  }
+  show();
 }
 
 /* ================= Thống kê ================= */
@@ -969,13 +1194,14 @@ function showUpdateBanner() {
 }
 
 /* ================= Điều hướng ================= */
-const routes = { home, learn, review, practice, quiz, cloze, listen, speak: speakPractice, dict, stats, settings };
+const routes = { home, learn, review, practice, quiz, cloze, listen, speak: speakPractice, dict, stats, settings,
+  academic, aclearn: () => learn('AC'), acphrases: acPhrases, acstyle: acStyle, acfill: acFill, acsection: acSection, acformal: acFormal, acerror: acError };
 const route = () => (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
 function go() {
   keyHandler = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const r = routes[route()] ? route() : 'home';
-  const tab = { learn: 'home', review: 'home', quiz: 'practice', cloze: 'practice', listen: 'practice', speak: 'practice' }[r] || r;
+  const tab = { learn: 'home', review: 'home', quiz: 'practice', cloze: 'practice', listen: 'practice', speak: 'practice' }[r] || (r.startsWith('ac') ? 'academic' : r);
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.r === tab));
   routes[r]();
   window.scrollTo(0, 0);
