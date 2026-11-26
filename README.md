@@ -3,6 +3,8 @@
 Ứng dụng web cài đặt được (PWA): một bộ mã nguồn dùng được trên **Android, iPhone/iPad, Windows, macOS, Linux**.
 Chạy được khi không có mạng, không cần tài khoản, tiến độ học lưu ngay trên thiết bị.
 
+**Phiên bản hiện tại: 1.0.0-beta** (xem mục *Lịch sử phiên bản* ở cuối).
+
 ## Tính năng
 - **Học từ mới mỗi ngày** bằng thẻ ghi nhớ (flashcard): phiên âm, phát âm, câu ví dụ kèm nghĩa.
 - **Ôn tập ngắt quãng** (thuật toán SM-2): từ nào sắp quên thì app mới đưa ra ôn lại. Với từ đã nhớ, app thỉnh thoảng hỏi ngược: thấy nghĩa tiếng Việt, gõ từ tiếng Anh.
@@ -82,3 +84,16 @@ sw.js                 service worker giúp chạy offline
 manifest.webmanifest  thông tin để cài app
 icons/                biểu tượng app
 ```
+
+## Lịch sử phiên bản
+### 1.0.0-beta (26/11/2026)
+Bản thử nghiệm đầu tiên, đủ tính năng cho V1:
+- Học từ bằng thẻ ghi nhớ, ôn tập ngắt quãng (SM-2), gõ từ khi ôn.
+- Trắc nghiệm, điền từ vào câu, nghe chép chính tả, luyện nói có chấm điểm.
+- 1.446 từ vựng (A1–B2 và học thuật), 60 câu giao tiếp.
+- Tiếng Anh học thuật: 170 mẫu câu theo phần bài báo, văn phong trang trọng, rào đón, lỗi thường gặp, 4 bài luyện, kiểm tra văn phong bản thảo.
+- Podcast luyện nghe: 26 tập hai giọng, phụ đề Anh–Việt, câu hỏi hiểu bài, tập "Từ của tôi".
+- Tự chọn giọng đọc rõ nhất trên từng thiết bị.
+- Đồng bộ tiến độ qua GitHub Gist, chuỗi ngày có nghỉ phép, thống kê, sao lưu/nhập dữ liệu, chế độ tối, chạy offline.
+
+Còn cần trước khi lên 1.0.0: dùng thử trên thiết bị thật (âm thanh, đồng bộ bằng mã thật, micro) và rà soát nội dung do AI soạn.

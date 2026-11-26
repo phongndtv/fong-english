@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VERSION = '1.0.0-beta';   // hiển thị trong Cài đặt; đổi cùng lúc với VERSION trong sw.js khi phát hành
+
 /* ================= Tiện ích ================= */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -1243,7 +1245,7 @@ function settings() {
       <input type="file" id="file" accept="application/json,.json" class="hidden">
       <button class="btn ghost block" id="reset" style="color:var(--bad)">Xóa toàn bộ tiến độ</button>
     </div>
-    <p class="muted small center">Fong English · ${WORDS.length} từ vựng (${LEVEL_IDS.join(', ')}) · ${PHRASES.length} câu giao tiếp</p>`);
+    <p class="muted small center"><b>Fong English ${APP_VERSION}</b><br>${WORDS.length} từ vựng (${LEVEL_IDS.join(', ')}) · ${PHRASES.length} câu giao tiếp · ${AC_PHRASES.length} mẫu câu học thuật · ${PODCASTS.length} tập podcast</p>`);
 
   const set = (k, v) => { st[k] = v; S.settingsT = Date.now(); save(); };
   $('#np').onchange = e => set('newPerDay', +e.target.value);
