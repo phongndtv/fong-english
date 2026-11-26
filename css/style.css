@@ -222,3 +222,16 @@ code { font-size: .9em; background: var(--bg); padding: 1px 5px; border-radius: 
 .phr .item > .grow b { color: var(--primary); }
 .wlist .item .line-bad b { color: var(--bad); }
 .wlist .item .line-good b { color: var(--good); }
+
+/* Podcast */
+.pod-lines .pline { padding: 10px 12px; border-radius: 12px; cursor: pointer; margin: 2px 0; transition: background .2s; }
+.pod-lines .pline:hover { background: var(--bg); }
+.pod-lines .pline.on { background: var(--primary-soft); }
+.pod-lines .who { font-size: .75rem; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: .04em; }
+.pod-lines .sp-B .who { color: var(--warn); }
+.pod-lines .en b { color: var(--primary); }
+.pod-lines .vi { font-size: .875rem; color: var(--muted); }
+.pod-lines.sub-en .vi { display: none; }
+.pod-lines.sub-none .en, .pod-lines.sub-none .vi { filter: blur(6px); transition: filter .2s; }
+.pod-lines.sub-none .pline:active .en, .pod-lines.sub-none .pline:active .vi { filter: none; }
+.pod-ctl .progress { height: 6px; }

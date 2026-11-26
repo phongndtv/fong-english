@@ -150,18 +150,23 @@ function loadVoices() {
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
 const pickVoice = () => voices.find(v => v.voiceURI === S.settings.voice) || voices[0];
 let lastUtter = null; // giữ tham chiếu: Chrome có thể thu gom và cắt ngang câu đang đọc
-function say(text, rate) {
+// opt: { voice, pitch, onend } — dùng cho podcast (mỗi người nói một giọng, đọc nối tiếp).
+function say(text, rate, opt = {}) {
   if (!('speechSynthesis' in window)) return toast('Thiết bị này không hỗ trợ đọc phát âm');
   if (!voices.length) loadVoices();
   const busy = speechSynthesis.speaking || speechSynthesis.pending;
   speechSynthesis.cancel();
   const u = lastUtter = new SpeechSynthesisUtterance(text);
-  const v = pickVoice();
+  const v = opt.voice || pickVoice();
   u.lang = v ? v.lang : 'en-US';
   if (v) u.voice = v;
   u.rate = rate || S.settings.rate;
-  u.pitch = 1;
+  u.pitch = opt.pitch || 1;
   u.volume = 1;
+  if (opt.onend) {
+    u.onend = () => { if (lastUtter === u) opt.onend(); };
+    u.onerror = e => { if (lastUtter === u && e.error !== 'interrupted' && e.error !== 'canceled') opt.onend(); };
+  }
   // Đọc ngay sau cancel() đôi khi bị nuốt mất âm đầu trên Chrome, nên chờ một nhịp
   if (busy) setTimeout(() => speechSynthesis.speak(u), 80); else speechSynthesis.speak(u);
 }
@@ -233,7 +238,7 @@ function home() {
     </a>
     <a class="card task" href="#/practice">
       <div class="ic">🎯</div>
-      <div class="grow"><b>Luyện tập</b><div class="muted small">Trắc nghiệm · Nghe chép · Luyện nói</div></div>
+      <div class="grow"><b>Luyện tập</b><div class="muted small">Trắc nghiệm · Podcast · Nghe chép · Luyện nói</div></div>
       <div class="chev">›</div>
     </a>
     <a class="card task" href="#/academic">
@@ -447,6 +452,8 @@ function practice() {
       <div class="grow"><b>Điền từ vào câu</b><div class="muted small">Đọc câu ví dụ, gõ từ còn thiếu · +3 XP mỗi câu đúng</div></div><div class="chev">›</div></a>
     <a class="card task" href="#/listen"><div class="ic">🎧</div>
       <div class="grow"><b>Nghe & chép chính tả</b><div class="muted small">Nghe từ/câu rồi gõ lại · +3 XP mỗi câu đúng</div></div><div class="chev">›</div></a>
+    <a class="card task" href="#/podcast"><div class="ic">🎧</div>
+      <div class="grow"><b>Podcast luyện nghe</b><div class="muted small">${PODCASTS.length} tập hội thoại hai giọng, phụ đề Anh–Việt · +10 XP mỗi tập</div></div><div class="chev">›</div></a>
     <a class="card task" href="#/speak"><div class="ic">🎤</div>
       <div class="grow"><b>Luyện nói</b><div class="muted small">${sr ? 'Nói theo câu mẫu, máy chấm phát âm · +3 XP' : 'Nghe và nói theo câu mẫu (trình duyệt này không chấm được giọng nói, hãy dùng Chrome hoặc Edge)'}</div></div><div class="chev">›</div></a>`);
 }
@@ -748,6 +755,7 @@ function academic() {
     <p class="muted">Dành cho người viết bài báo khoa học quốc tế: từ vựng học thuật, mẫu câu cho từng phần của bài báo, văn phong trang trọng và các lỗi người Việt hay mắc.</p>
     ${task('#/aclearn', '📚', 'Học từ vựng học thuật', `Đã học ${learned}/${words.length} từ · thẻ đến hạn được ôn chung ở mục Ôn tập`)}
     ${task('#/acphrases', '🧩', 'Mẫu câu theo phần bài báo', `${AC_PHRASES.length} mẫu câu · Tóm tắt, Mở đầu, Phương pháp, Kết quả, Thảo luận… · bấm 📋 để chép`)}
+    ${task('#/podcast?cat=academic', '🎧', 'Podcast học thuật', `${PODCASTS.filter(e => e.cat === 'academic').length} tập: gặp giáo sư hướng dẫn, trình bày hội thảo, trả lời phản biện…`)}
     ${task('#/acstyle', '✒️', 'Văn phong & lỗi thường gặp', `${ACADEMIC.formal.length} cách nói trang trọng · ${ACADEMIC.hedging.length} câu rào đón · ${ACADEMIC.errors.length} lỗi hay gặp`)}
     <h2>Luyện tập</h2>
     ${task('#/acfill', '✍️', 'Hoàn thành mẫu câu', 'Gõ từ khóa còn thiếu trong mẫu câu · +3 XP mỗi câu đúng')}
@@ -824,13 +832,13 @@ function acStyle() {
 
 // Bài trắc nghiệm dùng chung cho phần học thuật.
 // Mỗi câu: { prompt (HTML), opts (HTML), ans (vị trí đúng), explain (HTML), say (đọc sau khi trả lời) }
-function acChoice(qs, again, xp) {
+function acChoice(qs, again, xp, back = '#/academic') {
   let i = 0, score = 0;
   function show() {
-    if (i >= qs.length) { keyHandler = null; return resultCard(score, qs.length, again, '#/academic'); }
+    if (i >= qs.length) { keyHandler = null; return resultCard(score, qs.length, again, back); }
     const q = qs[i];
     let answered = false;
-    render(`${topbar(i, qs.length, '#/academic')}<div class="card">${q.prompt}
+    render(`${topbar(i, qs.length, back)}<div class="card">${q.prompt}
       <div class="options">${q.opts.map((o, k) => `<button class="btn option" data-k="${k}">${k + 1}. ${o}</button>`).join('')}</div>
       <div id="fb"></div></div>`);
     const answer = k => {
@@ -936,6 +944,173 @@ function acFill() {
     setTimeout(() => $('#ans')?.focus(), 50);
   }
   show();
+}
+
+/* ================= Podcast luyện nghe ================= */
+// Kịch bản ở js/podcasts-daily.js và js/podcasts-ac.js; app đọc bằng giọng máy, mỗi người nói một giọng.
+const param = k => new URLSearchParams(location.hash.split('?')[1] || '').get(k);
+const FEMALE = /female|aria|jenny|ava|emma|michelle|samantha|allison|zoe|susan|joelle|nicky|libby|sonia|serena|kate|karen|moira|tessa|zira|hazel|catherine|natasha|clara|jane|nancy|sara|ana\b|victoria|google us english/i;
+const MALE = /\bmale|guy|andrew|brian|ryan|david|mark|daniel|alex|tom\b|oliver|evan|nathan|fred|george|james|william|liam|christopher|eric|roger|steffan|thomas|aaron|arthur|gordon|rishi/i;
+// Giọng tốt nhất theo giới tính; nếu máy chỉ có một giọng thì đổi cao độ để phân biệt hai người nói.
+function podVoices(sp) {
+  const best = re => voices.find(v => re.test(v.name) && !(re === FEMALE ? MALE : FEMALE).test(v.name));
+  const pickFor = g => best(g === 'f' ? FEMALE : MALE);
+  const out = {};
+  for (const [k, s] of Object.entries(sp)) out[k] = { voice: pickFor(s.g) || voices[0], pitch: 1 };
+  const [a, b] = Object.keys(sp);
+  if (out[a].voice === out[b].voice) { out[a].pitch = sp[a].g === 'f' ? 1.15 : 0.85; out[b].pitch = sp[b].g === 'f' ? 1.15 : 0.85; if (out[a].pitch === out[b].pitch) out[b].pitch = 0.8; }
+  return out;
+}
+const POD_KEY = 'fong-english-pod';   // id tập → ngày nghe xong gần nhất (chỉ lưu trên máy này)
+const podDone = () => { try { return JSON.parse(localStorage.getItem(POD_KEY)) || {}; } catch (e) { return {}; } };
+const podMinutes = ep => Math.max(1, Math.round(ep.lines.reduce((a, l) => a + l[1].split(' ').length, 0) / 110));
+let podToken = 0;   // tăng mỗi lần chuyển trang để dừng chuỗi đọc đang chạy
+
+// Tập "Từ của tôi": ôn các từ đến hạn và vừa học, dựng từ thẻ của bạn.
+function myWordsEpisode() {
+  const due = new Set(dueCards());
+  const words = learnedWords().sort((a, b) => due.has(b.id) - due.has(a.id) || (S.cards[b.id].t || 0) - (S.cards[a.id].t || 0)).slice(0, 10);
+  if (words.length < 3) return null;
+  const lines = [['A', `Welcome to your personal word review. Today we will practice ${words.length} words.`, `Chào mừng bạn đến với bài ôn từ của riêng bạn. Hôm nay chúng ta luyện ${words.length} từ.`]];
+  words.forEach((w, k) => {
+    lines.push(['A', `Word ${k + 1}: ${w.w}.`, `Từ ${k + 1}: ${w.w} (${POS[w.pos]}) — ${w.vi}`]);
+    lines.push(['B', w.ex, w.exVi]);
+  });
+  lines.push(['A', 'Great job! Listen again tomorrow to remember these words even better.', 'Tốt lắm! Ngày mai nghe lại để nhớ các từ này lâu hơn nhé.']);
+  const questions = pick(words, 3).map(w => {
+    const others = pick(words.filter(x => x !== w), 3);
+    const opts = shuffle([w, ...others]);
+    return [`Which word means "${w.vi}"?`, opts.map(o => o.w), opts.indexOf(w)];
+  });
+  return { id: 'mine', cat: 'mine', level: 'Ôn', icon: '🗂️', title: 'My words', titleVi: 'Từ của tôi',
+    desc: 'Nghe lại các từ đến hạn ôn và các từ vừa học, mỗi từ kèm một câu ví dụ.',
+    speakers: { A: { name: 'Host', g: 'f' }, B: { name: 'Example', g: 'm' } }, lines, vocab: words.map(w => w.w), questions };
+}
+const findEpisode = id => id === 'mine' ? myWordsEpisode() : PODCASTS.find(e => e.id === id);
+
+let podCat = 'all';
+function podcastList() {
+  if (param('cat')) podCat = param('cat');
+  const done = podDone();
+  const cats = { all: 'Tất cả', daily: '💬 Giao tiếp', academic: '🎓 Học thuật' };
+  const mine = myWordsEpisode();
+  render(`<h1>🎧 Podcast luyện nghe</h1>
+    <p class="muted">Các tập hội thoại ngắn đọc bằng hai giọng, có phụ đề Anh–Việt. Nghe hết một tập được +10 XP, trả lời đúng câu hỏi được thêm XP.</p>
+    <a class="card task ${mine ? '' : 'done'}" href="${mine ? '#/pod?id=mine' : '#/learn'}"><div class="ic">🗂️</div>
+      <div class="grow"><b>Từ của tôi</b><div class="muted small">${mine ? 'Nghe lại ' + mine.vocab.length + ' từ đến hạn ôn và vừa học, kèm câu ví dụ' : 'Học ít nhất 3 từ để có tập nghe riêng'}</div></div><div class="chev">›</div></a>
+    <div class="chips" id="cats">${Object.entries(cats).map(([k, v]) => `<button class="chip ${k === podCat ? 'on' : ''}" data-c="${k}">${v}</button>`).join('')}</div>
+    <div id="eps"></div>`);
+  const draw = () => {
+    const eps = PODCASTS.filter(e => podCat === 'all' || e.cat === podCat);
+    $('#eps').innerHTML = eps.map(e => `<a class="card task" href="#/pod?id=${e.id}"><div class="ic">${e.icon}</div>
+      <div class="grow"><b>${esc(e.title)}</b> <span class="badge">${e.level === 'AC' ? 'Học thuật' : e.level}</span>${done[e.id] ? ' <span class="badge known">Đã nghe ✓</span>' : ''}
+        <div class="muted small">${esc(e.titleVi)} · ${e.lines.length} câu · ~${podMinutes(e)} phút</div></div><div class="chev">›</div></a>`).join('');
+  };
+  $$('#cats .chip').forEach(c => c.onclick = () => { podCat = c.dataset.c; $$('#cats .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
+  draw();
+}
+
+let podSub = 'both', podRate = 0;
+function podPlayer() {
+  const ep = findEpisode(param('id'));
+  if (!ep) { location.hash = '#/podcast'; return; }
+  const token = ++podToken;
+  const rate = () => podRate || S.settings.rate;
+  const vo = podVoices(ep.speakers);
+  const vocabRe = ep.vocab.length ? new RegExp('\\b(' + ep.vocab.map(v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?:s|es|ed|d|ing)?\\b', 'gi') : null;
+  const markVocab = s => vocabRe ? esc(s).replace(vocabRe, '<b>$&</b>') : esc(s);
+  let idx = 0, playing = false, finished = false, wake = null;
+  const subs = { both: 'Anh + Việt', en: 'Chỉ tiếng Anh', none: 'Ẩn phụ đề' };
+  const rates = [0.7, 0.8, 0.9, 1, 1.1];
+  render(`${pageHead(ep.icon + ' ' + esc(ep.title), ep.cat === 'academic' ? '#/podcast?cat=academic' : '#/podcast')}
+    <div class="card">
+      <div class="muted small">${esc(ep.titleVi)} · ${ep.level === 'AC' ? 'Học thuật' : ep.level} · ${Object.values(ep.speakers).map(s => esc(s.name)).join(' & ')}</div>
+      <p style="margin:6px 0 0">${esc(ep.desc)}</p>
+    </div>
+    <div class="card pod-ctl">
+      <div class="row" style="justify-content:center;gap:14px">
+        <button class="icon-btn" id="prev" aria-label="Câu trước">⏮</button>
+        <button class="icon-btn big" id="play" aria-label="Phát">▶️</button>
+        <button class="icon-btn" id="next" aria-label="Câu sau">⏭</button>
+      </div>
+      <div class="progress" style="margin:12px 0 4px"><div id="bar" style="width:0%"></div></div>
+      <div class="chips" id="rates" style="justify-content:center;margin:8px 0 4px">${rates.map(r => `<button class="chip ${r === rate() ? 'on' : ''}" data-r="${r}">${r}×</button>`).join('')}</div>
+      <div class="chips" id="subs" style="justify-content:center;margin:4px 0 0">${Object.entries(subs).map(([k, v]) => `<button class="chip ${k === podSub ? 'on' : ''}" data-s="${k}">${v}</button>`).join('')}</div>
+    </div>
+    <div class="card pod-lines sub-${podSub}" id="lines">${ep.lines.map(([sp, en, vi], i) => `<div class="pline sp-${sp}" data-i="${i}">
+        <div class="who">${esc(ep.speakers[sp].name)}</div>
+        <div class="en">${markVocab(en)}</div><div class="vi">${esc(vi)}</div></div>`).join('')}
+      <p class="muted small center" style="margin:10px 0 0">Bấm vào một câu để nghe từ câu đó${podSub === 'none' ? ' · bấm giữ để xem chữ' : ''}.</p>
+    </div>
+    <div class="card"><h2>Từ vựng trong tập</h2><div class="wlist">${ep.vocab.map(v => {
+      const w = WORD[wordId(v)];
+      return `<div class="item"><button class="icon-btn" data-say="${esc(v)}" aria-label="Nghe">🔊</button>
+        <div class="grow"><b>${esc(v)}</b>${w ? ` <span class="muted small">${esc(w.ipa)} · ${POS[w.pos]}</span><div>${esc(w.vi)}</div>` : ''}</div>
+        ${w ? `<span class="badge ${status(w.id)}">${{ new: 'Chưa học', learning: 'Đang học', known: 'Đã thuộc' }[status(w.id)]}</span>` : ''}</div>`;
+    }).join('')}</div></div>
+    <button class="btn primary block" id="quiz" style="margin-bottom:12px">✅ Trả lời ${ep.questions.length} câu hỏi hiểu bài</button>`);
+
+  const alive = () => token === podToken && route() === 'pod';
+  const setPlaying = p => {
+    playing = p;
+    $('#play').textContent = p ? '⏸' : '▶️';
+    $('#play').setAttribute('aria-label', p ? 'Tạm dừng' : 'Phát');
+    if (p && navigator.wakeLock && !wake) navigator.wakeLock.request('screen').then(w => { wake = w; }, () => {});
+    if (!p && wake) { wake.release().catch(() => {}); wake = null; }
+  };
+  const mark = () => {
+    $$('.pline').forEach((el, i) => el.classList.toggle('on', i === idx));
+    $('#bar').style.width = (idx / ep.lines.length * 100) + '%';
+    const el = $(`.pline[data-i="${idx}"]`);
+    if (el && playing) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const complete = () => {
+    setPlaying(false); finished = true;
+    $('#bar').style.width = '100%';
+    $$('.pline').forEach(el => el.classList.remove('on'));
+    const done = podDone();
+    if (done[ep.id] !== dayNum()) {
+      done[ep.id] = dayNum();
+      try { localStorage.setItem(POD_KEY, JSON.stringify(done)); } catch (e) {}
+      addXP(10);
+      toast('🎧 Nghe xong tập! +10 XP');
+    } else toast('🎧 Nghe xong tập!');
+    $('#quiz').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const playLine = () => {
+    if (!alive() || !playing) return;
+    if (idx >= ep.lines.length) return complete();
+    mark();
+    const [sp, en] = ep.lines[idx];
+    say(en, rate(), { ...vo[sp], onend: () => setTimeout(() => { if (alive() && playing) { idx++; playLine(); } }, 450) });
+  };
+  const start = i => { idx = i; finished = false; setPlaying(true); playLine(); };
+  const pause = () => { setPlaying(false); speechSynthesis.cancel(); };
+  $('#play').onclick = () => playing ? pause() : start(finished || idx >= ep.lines.length ? 0 : idx);
+  $('#prev').onclick = () => { const i = Math.max(0, idx - 1); playing ? start(i) : (idx = i, mark()); };
+  $('#next').onclick = () => { const i = Math.min(ep.lines.length - 1, idx + 1); playing ? start(i) : (idx = i, mark()); };
+  $$('.pline').forEach(el => el.onclick = () => start(+el.dataset.i));
+  $$('#rates .chip').forEach(c => c.onclick = () => { podRate = +c.dataset.r; $$('#rates .chip').forEach(x => x.classList.toggle('on', x === c)); });
+  $$('#subs .chip').forEach(c => c.onclick = () => {
+    podSub = c.dataset.s; $$('#subs .chip').forEach(x => x.classList.toggle('on', x === c));
+    $('#lines').className = 'card pod-lines sub-' + podSub;
+  });
+  $('#quiz').onclick = () => {
+    pause();
+    const back = '#/pod?id=' + ep.id;
+    acChoice(ep.questions.map(([q, opts, ans]) => ({
+      prompt: `<div class="muted center">${ep.icon} ${esc(ep.title)}</div><div class="question" style="font-size:1.15rem;line-height:1.5">${esc(q)}</div>`,
+      opts: opts.map(esc), ans, explain: 'Đáp án: ' + esc(opts[ans]), say: ''
+    })), back, 2, '#/podcast');
+  };
+  bindSay();
+  keyHandler = e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    if (e.code === 'Space') { e.preventDefault(); $('#play').click(); }
+    else if (e.key === 'ArrowLeft') $('#prev').click();
+    else if (e.key === 'ArrowRight') $('#next').click();
+  };
+  mark();
 }
 
 /* ================= Thống kê ================= */
@@ -1195,13 +1370,14 @@ function showUpdateBanner() {
 
 /* ================= Điều hướng ================= */
 const routes = { home, learn, review, practice, quiz, cloze, listen, speak: speakPractice, dict, stats, settings,
-  academic, aclearn: () => learn('AC'), acphrases: acPhrases, acstyle: acStyle, acfill: acFill, acsection: acSection, acformal: acFormal, acerror: acError };
+  academic, aclearn: () => learn('AC'), acphrases: acPhrases, acstyle: acStyle, acfill: acFill, acsection: acSection, acformal: acFormal, acerror: acError,
+  podcast: podcastList, pod: podPlayer };
 const route = () => (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
 function go() {
   keyHandler = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   const r = routes[route()] ? route() : 'home';
-  const tab = { learn: 'home', review: 'home', quiz: 'practice', cloze: 'practice', listen: 'practice', speak: 'practice' }[r] || (r.startsWith('ac') ? 'academic' : r);
+  const tab = { learn: 'home', review: 'home', quiz: 'practice', cloze: 'practice', listen: 'practice', speak: 'practice', podcast: 'practice', pod: 'practice' }[r] || (r.startsWith('ac') ? 'academic' : r);
   $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.r === tab));
   routes[r]();
   window.scrollTo(0, 0);
