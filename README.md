@@ -18,6 +18,7 @@ Chạy được khi không có mạng, không cần tài khoản, tiến độ h
 - **🎓 Tiếng Anh học thuật** cho người viết bài báo khoa học quốc tế (tab *Học thuật*):
   - từ vựng học thuật (trình độ *AC*, 7 chủ đề: phương pháp, dữ liệu, lập luận, xu hướng, so sánh, động từ trích dẫn, liên kết), học và ôn bằng thẻ như các trình độ khác;
   - mẫu câu theo từng phần bài báo (Tóm tắt, Mở đầu, Tổng quan, Phương pháp, Kết quả, Thảo luận, Kết luận, thư gửi tạp chí và phản hồi phản biện), kèm lưu ý về thì và cấu trúc, tìm kiếm và nút chép;
+  - **kiểm tra văn phong bản thảo**: dán đoạn văn, app tô màu lỗi người Việt hay mắc (researches, discuss about, et.al…), từ ngữ thân mật, viết tắt, khẳng định quá mạnh, câu quá dài, chính tả Anh–Mỹ lẫn Anh–Anh, kèm gợi ý sửa. Chạy hoàn toàn trên máy, không gửi văn bản đi đâu;
   - văn phong trang trọng, cách rào đón (hedging), lỗi người Việt hay mắc;
   - bài luyện: hoàn thành mẫu câu, nhận biết phần của bài báo, chọn cách viết trang trọng, chọn câu viết đúng.
 - Chế độ sáng/tối, phím tắt trên máy tính (Space, 1–4, Enter), sao lưu/nhập dữ liệu.
@@ -74,6 +75,7 @@ js/data.js            trình độ, chủ đề, từ vựng A1 và câu giao ti
 js/words-a2/b1/b2.js  từ vựng các trình độ A2, B1, B2
 js/words-ac.js        từ vựng học thuật
 js/academic.js        mẫu câu bài báo khoa học, văn phong, lỗi thường gặp
+js/style-check.js     quy tắc kiểm tra văn phong bản thảo
 js/podcasts-*.js      kịch bản podcast (giao tiếp, học thuật)
 js/app.js             toàn bộ chức năng
 sw.js                 service worker giúp chạy offline

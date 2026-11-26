@@ -235,3 +235,26 @@ code { font-size: .9em; background: var(--bg); padding: 1px 5px; border-radius: 
 .pod-lines.sub-none .en, .pod-lines.sub-none .vi { filter: blur(6px); transition: filter .2s; }
 .pod-lines.sub-none .pline:active .en, .pod-lines.sub-none .pline:active .vi { filter: none; }
 .pod-ctl .progress { height: 6px; }
+
+/* Kiểm tra văn phong */
+textarea.input { width: 100%; resize: vertical; min-height: 160px; font: inherit; line-height: 1.5; }
+.checked { margin-top: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.checked mark { color: inherit; border-radius: 4px; padding: 1px 2px; cursor: pointer; border-bottom: 2px solid; }
+.checked mark sup { font-size: .65rem; font-weight: 700; margin-left: 1px; }
+mark.t-err { background: var(--bad-soft); border-color: var(--bad); }
+mark.t-hedge { background: var(--warn-soft); border-color: var(--warn); }
+mark.t-style { background: var(--primary-soft); border-color: var(--primary); }
+.chip.t-err.on { background: var(--bad); border-color: var(--bad); }
+.chip.t-hedge.on { background: var(--warn); border-color: var(--warn); }
+.chip.t-style.on { background: var(--primary); border-color: var(--primary); }
+.iss-item { cursor: pointer; border-radius: 10px; }
+.iss-item .num { min-width: 24px; height: 24px; border-radius: 99px; display: grid; place-items: center; font-size: .75rem; font-weight: 700; color: #fff; align-self: flex-start; margin-top: 2px; }
+.iss-item.t-err .num { background: var(--bad); }
+.iss-item.t-hedge .num { background: var(--warn); }
+.iss-item.t-style .num { background: var(--primary); }
+.iss-item .sugg { color: var(--good); font-weight: 600; }
+.hide-err mark.t-err, .hide-hedge mark.t-hedge, .hide-style mark.t-style { background: none; border-color: transparent; }
+.hide-err mark.t-err sup, .hide-hedge mark.t-hedge sup, .hide-style mark.t-style sup { display: none; }
+.hide-err .iss-item.t-err, .hide-hedge .iss-item.t-hedge, .hide-style .iss-item.t-style { display: none; }
+.flash { animation: flash 1.2s ease; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }

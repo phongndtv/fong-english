@@ -1,6 +1,6 @@
 // Service worker: lưu toàn bộ ứng dụng vào bộ nhớ đệm để chạy offline.
 // Khi sửa nội dung, tăng VERSION để thiết bị tải bản mới.
-const VERSION = 'fong-english-v6';
+const VERSION = 'fong-english-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS = [
   './js/words-b2.js',
   './js/words-ac.js',
   './js/academic.js',
+  './js/style-check.js',
   './js/podcasts-daily.js',
   './js/podcasts-ac.js',
   './js/app.js',

@@ -753,6 +753,7 @@ function academic() {
     <div class="grow"><b>${title}</b><div class="muted small">${sub}</div></div><div class="chev">›</div></a>`;
   render(`<h1>🎓 Tiếng Anh học thuật</h1>
     <p class="muted">Dành cho người viết bài báo khoa học quốc tế: từ vựng học thuật, mẫu câu cho từng phần của bài báo, văn phong trang trọng và các lỗi người Việt hay mắc.</p>
+    ${task('#/accheck', '🩺', 'Kiểm tra văn phong bản thảo', 'Dán đoạn văn, app đánh dấu lỗi hay gặp, từ thân mật, khẳng định quá mạnh · không gửi đi đâu')}
     ${task('#/aclearn', '📚', 'Học từ vựng học thuật', `Đã học ${learned}/${words.length} từ · thẻ đến hạn được ôn chung ở mục Ôn tập`)}
     ${task('#/acphrases', '🧩', 'Mẫu câu theo phần bài báo', `${AC_PHRASES.length} mẫu câu · Tóm tắt, Mở đầu, Phương pháp, Kết quả, Thảo luận… · bấm 📋 để chép`)}
     ${task('#/podcast?cat=academic', '🎧', 'Podcast học thuật', `${PODCASTS.filter(e => e.cat === 'academic').length} tập: gặp giáo sư hướng dẫn, trình bày hội thảo, trả lời phản biện…`)}
@@ -828,6 +829,58 @@ function acStyle() {
   };
   $$('#tabs .chip').forEach(c => c.onclick = () => { acTab = c.dataset.t; $$('#tabs .chip').forEach(x => x.classList.toggle('on', x === c)); draw(); });
   draw();
+}
+
+// Kiểm tra văn phong bản thảo (quy tắc ở js/style-check.js). Bản nháp chỉ lưu trên máy này.
+const DRAFT_KEY = 'fong-english-draft';
+const CHECK_SAMPLE = 'Nowadays, a lot of researches have looked into the affect of salinity on rice production. In this paper, we discuss about the results of a field survey. 25 farmers was interviewed in 2023. The data clearly proves that the new variety is very unique! In the other hand, the price of seed is very expensive, so farmers don\'t adopt it.';
+const CHECK_TYPES = { err: 'Lỗi', hedge: 'Khẳng định', style: 'Văn phong' };
+let checkShow = { err: true, hedge: true, style: true };
+function acCheck() {
+  let draft = '';
+  try { draft = localStorage.getItem(DRAFT_KEY) || ''; } catch (e) {}
+  render(`${pageHead('Kiểm tra văn phong bản thảo')}
+    <p class="muted small">Dán một đoạn bản thảo tiếng Anh (Abstract, Introduction…). App đánh dấu lỗi người Việt hay mắc, từ ngữ thân mật và khẳng định quá mạnh. Văn bản chỉ được xử lý trên máy bạn, không gửi đi đâu.</p>
+    <textarea class="input" id="draft" rows="8" placeholder="Paste your paragraph here..." spellcheck="false">${esc(draft)}</textarea>
+    <div class="row" style="margin:10px 0">
+      <button class="btn ghost" id="sample">Đoạn ví dụ</button><button class="btn ghost" id="clear">Xóa</button>
+      <button class="btn primary" id="run" style="flex:1">🩺 Kiểm tra</button></div>
+    <div id="res"></div>`);
+  const ta = $('#draft');
+  const store = () => { try { localStorage.setItem(DRAFT_KEY, ta.value); } catch (e) {} };
+  const run = () => {
+    const text = ta.value;
+    if (!text.trim()) { $('#res').innerHTML = ''; return toast('Hãy dán đoạn văn cần kiểm tra'); }
+    const iss = checkStyle(text);
+    const cnt = t => iss.filter(i => i.t === t).length;
+    let marked = '', at = 0;
+    iss.forEach((i, n) => {
+      marked += esc(text.slice(at, i.start)) + `<mark class="t-${i.t}" data-n="${n}" title="${esc(i.m)}">${esc(text.slice(i.start, i.end))}<sup>${n + 1}</sup></mark>`;
+      at = i.end;
+    });
+    marked += esc(text.slice(at));
+    $('#res').innerHTML = `<div class="card">
+        <div class="row between"><h2 style="margin:0">Kết quả</h2><span class="muted small">${text.trim().split(/\s+/).length} từ · ${iss.length} gợi ý</span></div>
+        ${iss.length ? `<div class="chips" id="flt">${Object.keys(CHECK_TYPES).map(t => `<button class="chip t-${t} ${checkShow[t] ? 'on' : ''}" data-t="${t}">${CHECK_TYPES[t]} · ${cnt(t)}</button>`).join('')}</div>`
+          : '<div class="feedback ok">Không thấy vấn đề nào theo bộ quy tắc. Vẫn nên đọc lại toàn bài hoặc nhờ người bản ngữ xem giúp.</div>'}
+        <div class="checked" id="marked">${marked.replace(/\n/g, '<br>')}</div></div>
+      ${iss.length ? `<div class="card wlist">${iss.map((i, n) => `<div class="item iss-item t-${i.t}" data-n="${n}"><span class="num">${n + 1}</span>
+        <div class="grow"><b>${esc(text.slice(i.start, i.end).trim())}</b> → <span class="sugg">${esc(i.s)}</span>
+          <div class="ex">${CHECK_TYPES[i.t]}: ${esc(i.m)}</div></div></div>`).join('')}</div>` : ''}
+      <p class="muted small">Bộ kiểm tra dựa trên quy tắc nên có thể bỏ sót hoặc báo nhầm. Hãy coi mỗi gợi ý là lời nhắc để cân nhắc, không phải sửa máy móc.</p>`;
+    const filter = () => { $('#res').className = Object.keys(checkShow).filter(t => !checkShow[t]).map(t => 'hide-' + t).join(' '); };
+    $$('#flt .chip').forEach(c => c.onclick = () => { checkShow[c.dataset.t] = !checkShow[c.dataset.t]; c.classList.toggle('on'); filter(); });
+    filter();
+    const flash = el => { if (!el) return; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); };
+    $$('#marked mark').forEach(m => m.onclick = () => flash($(`.iss-item[data-n="${m.dataset.n}"]`)));
+    $$('.iss-item').forEach(it => it.onclick = () => flash($(`#marked mark[data-n="${it.dataset.n}"]`)));
+  };
+  ta.oninput = store;
+  ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } };
+  $('#run').onclick = run;
+  $('#sample').onclick = () => { ta.value = CHECK_SAMPLE; store(); run(); };
+  $('#clear').onclick = () => { ta.value = ''; store(); $('#res').innerHTML = ''; ta.focus(); };
+  if (draft.trim()) run();
 }
 
 // Bài trắc nghiệm dùng chung cho phần học thuật.
@@ -1370,7 +1423,7 @@ function showUpdateBanner() {
 
 /* ================= Điều hướng ================= */
 const routes = { home, learn, review, practice, quiz, cloze, listen, speak: speakPractice, dict, stats, settings,
-  academic, aclearn: () => learn('AC'), acphrases: acPhrases, acstyle: acStyle, acfill: acFill, acsection: acSection, acformal: acFormal, acerror: acError,
+  academic, aclearn: () => learn('AC'), acphrases: acPhrases, acstyle: acStyle, acfill: acFill, acsection: acSection, acformal: acFormal, acerror: acError, accheck: acCheck,
   podcast: podcastList, pod: podPlayer };
 const route = () => (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
 function go() {
