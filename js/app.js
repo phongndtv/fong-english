@@ -121,18 +121,49 @@ function schedule(id, q) {
 const fmtInterval = d => d === 0 ? 'hôm nay' : d < 30 ? d + ' ngày' : d < 365 ? Math.round(d / 30) + ' tháng' : (d / 365).toFixed(1) + ' năm';
 
 /* ================= Phát âm (đọc văn bản) ================= */
+// Chấm điểm giọng: giọng thần kinh (Edge "Natural", Apple "Premium/Enhanced") rõ nhất,
+// rồi đến giọng Google, giọng hệ thống tốt; loại giọng eSpeak và giọng "vui" của macOS.
+const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|grandma|grandpa|rocko|sandy|shelley|flo\b|eddy|reed|fred|junior|kathy|ralph/i;
+const GOOD_NAMES = /aria|jenny|guy|ava|andrew|emma|brian|michelle|samantha|allison|zoe|evan|nathan|susan|joelle|nicky|tom\b|libby|sonia|ryan|serena|daniel|kate|oliver/i;
+function voiceScore(v) {
+  const n = v.name;
+  let s = 0;
+  if (/natural|neural/i.test(n)) s += 100;
+  else if (/premium/i.test(n)) s += 90;
+  else if (/enhanced/i.test(n)) s += 80;
+  else if (/google/i.test(n) || /^English United/i.test(n)) s += 60; // Android dùng giọng Google
+  else if (/microsoft/i.test(n)) s += 20;
+  if (GOOD_NAMES.test(n)) s += 30;
+  if (/espeak|\+/i.test(n) || /espeak/i.test(v.voiceURI)) s -= 200;
+  if (NOVELTY.test(n)) s -= 150;
+  const lang = v.lang.replace('_', '-');
+  if (/^en-US/i.test(lang)) s += 15; else if (/^en-GB/i.test(lang)) s += 10;
+  else if (/^en-(AU|CA|IE|NZ)/i.test(lang)) s += 5;
+  if (v.default) s += 3;
+  return s;
+}
 let voices = [];
-function loadVoices() { voices = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); }
+function loadVoices() {
+  voices = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang))
+    .sort((a, b) => voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name));
+}
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+const pickVoice = () => voices.find(v => v.voiceURI === S.settings.voice) || voices[0];
+let lastUtter = null; // giữ tham chiếu: Chrome có thể thu gom và cắt ngang câu đang đọc
 function say(text, rate) {
   if (!('speechSynthesis' in window)) return toast('Thiết bị này không hỗ trợ đọc phát âm');
+  if (!voices.length) loadVoices();
+  const busy = speechSynthesis.speaking || speechSynthesis.pending;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const v = voices.find(v => v.voiceURI === S.settings.voice) || voices.find(v => v.lang === 'en-US') || voices[0];
+  const u = lastUtter = new SpeechSynthesisUtterance(text);
+  const v = pickVoice();
   u.lang = v ? v.lang : 'en-US';
   if (v) u.voice = v;
   u.rate = rate || S.settings.rate;
-  speechSynthesis.speak(u);
+  u.pitch = 1;
+  u.volume = 1;
+  // Đọc ngay sau cancel() đôi khi bị nuốt mất âm đầu trên Chrome, nên chờ một nhịp
+  if (busy) setTimeout(() => speechSynthesis.speak(u), 80); else speechSynthesis.speak(u);
 }
 
 /* ================= Giao diện chung ================= */
@@ -741,8 +772,9 @@ function settings() {
     </div>
     <div class="card">
       <h2>Phát âm</h2>
-      <div class="field"><label for="vc">Giọng đọc</label><select id="vc"><option value="">Tự động (Anh–Mỹ)</option>
-        ${voices.map(v => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === st.voice ? 'selected' : ''}>${esc(v.name)} (${v.lang})</option>`).join('')}</select></div>
+      <div class="field"><label for="vc">Giọng đọc</label><select id="vc"><option value="">Tự động — giọng rõ nhất${voices[0] ? ': ' + esc(voices[0].name) : ''}</option>
+        ${voices.map((v, i) => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === st.voice ? 'selected' : ''}>${i < 3 && voiceScore(v) >= 60 ? '⭐ ' : ''}${esc(v.name)} (${v.lang})</option>`).join('')}</select></div>
+      ${voices.length && voiceScore(voices[0]) < 60 ? `<p class="muted small">Máy này chỉ có giọng đọc cơ bản. Để nghe rõ hơn: trên máy tính dùng <b>Microsoft Edge</b> (có giọng Natural) hoặc Chrome khi có mạng; trên Android cài <b>Speech Services by Google</b>; trên iPhone vào Cài đặt → Trợ năng → Nội dung được đọc → Giọng nói → English và tải giọng <i>Enhanced/Premium</i>.</p>` : ''}
       <div class="field"><label for="rt">Tốc độ đọc: <b id="rtv">${st.rate}</b></label><input type="range" id="rt" min="0.5" max="1.3" step="0.05" value="${st.rate}"></div>
       <button class="btn block" id="test">🔊 Nghe thử</button>
     </div>
